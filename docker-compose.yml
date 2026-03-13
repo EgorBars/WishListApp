@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: wishlist-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wishlist_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wishlist_password}
+      POSTGRES_DB: ${POSTGRES_DB:-wishlist_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: wishlist-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://wishlist_user:wishlist_password@db:5432/wishlist_db}
+    ports:
+      - "8000:8000"
+    restart: always
+
+volumes:
+  db_data:
+
