@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_UR, // Убедитесь, что адрес верный
+  baseURL: import.meta.env.VITE_API_URL, // Убедитесь, что адрес верный
 });
 
 api.interceptors.response.use(
