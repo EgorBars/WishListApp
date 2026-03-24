@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Spinner } from '../common/Spinner';
 
-export const PrivateRoute = ({ children }: { children: React.ReactElement }) => {
+export function PublicRoute({ children }: { children: React.ReactElement }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -14,9 +14,9 @@ export const PrivateRoute = ({ children }: { children: React.ReactElement }) => 
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
-};
+}

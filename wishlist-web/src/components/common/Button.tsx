@@ -1,19 +1,35 @@
 import React from 'react';
+import { Spinner } from './Spinner'; // Импортируем наш новый спиннер
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger';
   isLoading?: boolean;
+  /** Текст рядом со спиннером при isLoading (п. 5.2.3, 5.3.3 ТЗ). */
+  loadingLabel?: string;
 }
 
-export const Button: React.FC<ButtonProps> = ({ 
-  children, variant = 'primary', isLoading, disabled, className, ...props 
+export const Button: React.FC<ButtonProps> = ({
+  children,
+  variant = 'primary',
+  isLoading,
+  loadingLabel = 'Загрузка...',
+  disabled,
+  className = '',
+  ...props
 }) => {
-  const baseStyles = "w-full py-2.5 px-4 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center";
+  // Базовые стили согласно п. 5.1.3 (Default, Focus, Disabled)
+  const baseStyles = "w-full py-3.5 px-6 rounded-2xl font-bold transition-all duration-200 focus:outline-none focus:ring-4 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]";
   
+  // Варианты оформления (п. 4.11)
   const variants = {
-    primary: "bg-brand-primary text-white hover:bg-opacity-90 focus:ring-brand-primary",
-    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-400",
-    danger: "bg-brand-error text-white hover:bg-opacity-90 focus:ring-brand-error",
+    // Primary: брендовый фиолетовый
+    primary: "bg-brand-primary text-white hover:bg-indigo-700 focus:ring-indigo-100 shadow-lg shadow-indigo-100",
+    
+    // Secondary: нейтральный серый
+    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-200",
+    
+    // Danger: красный для удаления
+    danger: "bg-brand-error text-white hover:bg-red-600 focus:ring-red-100 shadow-lg shadow-red-100",
   };
 
   return (
@@ -23,14 +39,15 @@ export const Button: React.FC<ButtonProps> = ({
       {...props}
     >
       {isLoading ? (
-        <span className="flex items-center">
-          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          Загрузка...
+        <>
+          <Spinner size="sm" className="text-current" />
+          <span className="tracking-wide">{loadingLabel}</span>
+        </>
+      ) : (
+        <span className="flex items-center gap-2">
+          {children}
         </span>
-      ) : children}
+      )}
     </button>
   );
 };

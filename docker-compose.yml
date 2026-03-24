@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   db:
     image: postgres:15-alpine
@@ -42,10 +44,6 @@ services:
     networks:
       - wishlist_network
 
-networks:
-  wishlist_network:
-    driver: bridge
-
   frontend:
     build:
       context: ./wishlist-web
@@ -57,12 +55,19 @@ networks:
       - ./wishlist-web:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:8000
+      # Добавил /api/v1, так как твой фронтенд ожидает этот путь
+      - VITE_API_URL=http://localhost:8000/api/v1
     depends_on:
       db:
         condition: service_healthy
       app:
         condition: service_started
+    networks:
+      - wishlist_network
+
+networks:
+  wishlist_network:
+    driver: bridge
 
 volumes:
   postgres_data:
