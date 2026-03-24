@@ -17,17 +17,24 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // Бэкенд FastAPI обычно ожидает OAuth2 форму (username/password)
-      // Если твой бэкенд ждет JSON, оставляем так:
-      const response = await api.post('/auth/login', {
-        username: formData.email, // FastAPI часто использует поле username
-        password: formData.password
+      // Используем URLSearchParams вместо обычного объекта или FormData
+      const params = new URLSearchParams();
+      params.append('username', formData.email); // Важно: FastAPI ждет именно 'username'
+      params.append('password', formData.password);
+
+      const response = await api.post('/auth/login', params, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
       });
 
+      console.log("Успешный вход!", response.data);
       login(response.data.access_token);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Неверный email или пароль');
+      console.error("Ошибка логина:", err.response?.data);
+      // Если бэкенд вернул 422, выведем детали ошибки в консоль
+      setError(err.response?.data?.detail || 'Неверный логин или пароль');
     } finally {
       setIsLoading(false);
     }
