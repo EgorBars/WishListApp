@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus, Gift, Edit2, Trash2, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { WishlistSummary } from '../types';
