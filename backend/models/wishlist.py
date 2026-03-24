@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,8 +24,18 @@ class Wishlist(Base):
     title: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=True,
+    )
 
-    user: Mapped["User"] = relationship()
     items: Mapped[list["WishlistItem"]] = relationship(
         back_populates="wishlist", cascade="all, delete-orphan"
     )
@@ -42,6 +52,11 @@ class Item(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="RUB")
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
 
     wishlists: Mapped[list["WishlistItem"]] = relationship(back_populates="item")
 
@@ -85,5 +100,6 @@ class WishlistItem(Base):
             "priority BETWEEN 1 AND 5",
             name="ck_wishlist_items_priority_range",
         ),
+        Index("ix_wishlist_items_wishlist_id", "wishlist_id"),
+        Index("ix_wishlist_items_item_id", "item_id"),
     )
-
