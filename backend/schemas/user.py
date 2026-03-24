@@ -9,7 +9,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, max_length=50)
 
 
 class UserRead(UserBase):
@@ -17,8 +17,12 @@ class UserRead(UserBase):
     is_active: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+
+class LoginRequest(BaseModel):
+    username: EmailStr = Field(description="Email used as username")
+    password: str = Field(min_length=1)
 
 
 class Token(BaseModel):
@@ -28,4 +32,21 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     sub: str | None = None
+    token_type: str | None = None
 
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=50)
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str

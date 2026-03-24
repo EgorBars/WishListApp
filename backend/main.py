@@ -1,37 +1,32 @@
 import logging
-from typing import Sequence
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from db.session import Base, engine
-from routers import auth, users
-
+from core.config import get_settings
+from routers import auth, users, wishlists
 
 logger = logging.getLogger("wishlist_app")
 
+settings = get_settings()
 
-app = FastAPI(title="WishListApp API")
+app = FastAPI(title=settings.app_name)
 
-# CORS: разрешаем запросы с фронтенда
-origins: Sequence[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+origins = [settings.frontend_url, "http://localhost:5173", "http://127.0.0.1:5173"]
+if "localhost:3000" not in settings.frontend_url:
+    origins.extend(["http://localhost:3000", "http://127.0.0.1:3000"])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=list(dict.fromkeys(origins)),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+api_v1 = APIRouter(prefix="/api/v1")
+api_v1.include_router(auth.router)
+api_v1.include_router(users.router)
+api_v1.include_router(wishlists.router)
 
-@app.on_event("startup")
-async def on_startup() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables ensured (create_all).")
-
-
-app.include_router(auth.router)
-app.include_router(users.router)
-
+app.include_router(api_v1)
