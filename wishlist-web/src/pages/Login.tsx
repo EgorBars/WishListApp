@@ -123,6 +123,7 @@ const Login = () => {
               placeholder="example@mail.com"
               value={email}
               error={emailError}
+              maxLength={255} // Ограничение согласно спецификации БД
               onChange={(e) => {
                 setEmail(e.target.value);
                 if (emailError) setEmailError('');
@@ -136,7 +137,7 @@ const Login = () => {
                 label="Пароль"
                 type="password"
                 autoComplete="current-password"
-                maxLength={50}
+                maxLength={50} // Ограничение согласно спецификации (8-50)
                 placeholder="••••••••"
                 value={password}
                 error={passwordError}
@@ -195,6 +196,7 @@ const Login = () => {
             placeholder="ivan@example.com"
             value={recoveryEmail}
             error={recoveryEmailError}
+            maxLength={255} // Ограничение для email в модалке
             onChange={(e) => {
               setRecoveryEmail(e.target.value);
               if (recoveryEmailError) setRecoveryEmailError('');
