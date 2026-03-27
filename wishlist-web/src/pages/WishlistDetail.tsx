@@ -38,6 +38,8 @@ const WishlistDetail = () => {
     note: ''
   });
 
+  const [saving, setSaving] = useState(false); // <-- Добавляем сюда
+
   // Валидация URL (обязательное поле)
   const isValidUrl = (url: string) => {
     if (!url.trim()) return false;
@@ -105,18 +107,21 @@ const WishlistDetail = () => {
 
   const handleSaveItem = async () => {
     if (!isItemFormValid) return;
+    setSaving(true); // Включаем индикатор загрузки
     try {
       if (editingItem) {
+        // Редактирование
         await api.put(`/wishlists/${id}/items/${editingItem.id}`, {
           title: itemForm.title.trim(),
           url: itemForm.url.trim(),
           price: Number(itemForm.price),
           currency: itemForm.currency,
-          image_url: itemForm.image_url.trim() || null,
-          note: itemForm.note.trim() || null,
+          image_url: itemForm.image_url.trim(),
+          note: itemForm.note.trim(),
           priority: itemForm.priority,
         });
       } else {
+        // Создание нового
         await api.post(`/wishlists/${id}/items`, {
           title: itemForm.title.trim(),
           url: itemForm.url.trim(),
@@ -128,8 +133,16 @@ const WishlistDetail = () => {
         });
       }
       setIsItemModalOpen(false);
-      fetchData();
-    } catch (e) { setIsItemModalOpen(false); }
+      setEditingItem(null);
+      await fetchData(); // Обновляем список после сохранения
+    } catch (e: any) {
+      console.error("Save error:", e);
+      // Если это ошибка валидации или конфликт (409), выводим текст ошибки от сервера
+      const serverError = e.response?.data?.detail;
+      alert(serverError || "Ошибка при сохранении товара. Попробуйте еще раз.");
+    } finally {
+      setSaving(false); // Выключаем индикатор в любом случае
+    }
   };
 
   const togglePurchased = async (item: WishlistItem) => {
@@ -290,7 +303,7 @@ const WishlistDetail = () => {
           />
           
           <Input 
-            label="Ссылка на магазин *" 
+            label="Ссылка на товар *"
             placeholder="https://..." 
             value={itemForm.url} 
             error={!itemForm.url.trim() ? 'Ссылка обязательна' : (!isValidUrl(itemForm.url) ? 'Неверный формат ссылки' : '')}
@@ -331,7 +344,11 @@ const WishlistDetail = () => {
           
           <Textarea label="Комментарий (опционально)" placeholder="Цвет, размер и т.д." className="h-24" maxLength={500} value={itemForm.note} onChange={e => setItemForm({...itemForm, note: e.target.value})} />
           
-          <Button onClick={handleSaveItem} disabled={!isItemFormValid}>
+          <Button
+            onClick={handleSaveItem}
+            disabled={!isItemFormValid || saving} // Кнопка неактивна, если форма невалидна ИЛИ идет сохранение
+            isLoading={saving}                    // Показывает спиннер внутри кнопки
+            >
             {editingItem ? "Сохранить" : "Добавить"}
           </Button>
         </div>
