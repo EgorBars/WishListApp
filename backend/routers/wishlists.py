@@ -267,8 +267,7 @@ async def update_item(
     )
 
     if wants_update_global:
-        # If the item is used in other wishlists, keep it immutable there:
-        # create (or reuse) a separate Item and re-link this wishlist item.
+        # Считаем, сколько связей у этого конкретного товара
         cnt_stmt = select(func.count()).select_from(WishlistItem).where(WishlistItem.item_id == item.id)
         cnt = int((await db.execute(cnt_stmt)).scalar_one())
 
@@ -276,25 +275,32 @@ async def update_item(
         next_url = normalized_url if normalized_url is not None else item.url
         next_price = body.price if body.price is not None else item.price
         next_currency = body.currency if body.currency is not None else item.currency
-        next_image_url = body.image_url if body.image_url is not None else item.image_url
-
-        if cnt > 1:
-            existing = (await db.execute(select(Item).where(Item.url == next_url))).scalar_one_or_none()
-            target_item = existing
-            if target_item is None:
-                target_item = Item(
-                    url=next_url,
-                    title=next_title,
-                    price=next_price,
-                    currency=next_currency,
-                    image_url=next_image_url,
-                )
-                db.add(target_item)
-                await db.flush()
-
-            wi.item_id = target_item.id
-            item = target_item
+        if body.image_url is not None:
+            # Если пришла строка (даже пустая), обрезаем пробелы
+            val = body.image_url.strip()
+            # Если строка стала пустой — пишем в базу None (NULL)
+            next_image_url = val if val != "" else None
         else:
+            # Если поле вообще не прислали в JSON, оставляем как было
+            next_image_url = item.image_url
+
+        # Если товар "общий" (используется в других списках), создаем копию для текущего пользователя,
+        # чтобы не менять данные у других людей.
+        if cnt > 1:
+            # Создаем новый товар, так как мы не хотим портить данные другим
+            new_item = Item(
+                url=next_url,
+                title=next_title,
+                price=next_price,
+                currency=next_currency,
+                image_url=next_image_url,
+            )
+            db.add(new_item)
+            await db.flush()
+            wi.item_id = new_item.id
+            item = new_item
+        else:
+            # Если товар только наш, просто обновляем его
             item.title = next_title
             item.url = next_url
             item.price = next_price
