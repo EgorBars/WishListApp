@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.session import get_db
 from dependencies.auth import get_current_user
@@ -170,12 +171,13 @@ async def add_item(
 ) -> WishlistItemOut:
     wl = await _get_owned_wishlist(wishlist_id, current_user, db)
 
-    stmt = select(Item).where(Item.url == body.url)
+    normalized_url = body.url.strip()
+    stmt = select(Item).where(Item.url == normalized_url)
     res = await db.execute(stmt)
     item: Item | None = res.scalar_one_or_none()
     if item is None:
         item = Item(
-            url=body.url,
+            url=normalized_url,
             title=body.title,
             price=body.price,
             currency=body.currency,
@@ -204,7 +206,15 @@ async def add_item(
         is_purchased=False,
     )
     db.add(wi)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Most likely unique constraint (wishlist_id, item_id) in concurrent requests.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Item already in this wishlist",
+        )
     await db.refresh(wi)
     await db.refresh(item)
 
@@ -241,6 +251,56 @@ async def update_item(
     if wi is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
+    stmt_item = select(Item).where(Item.id == item_id)
+    item = (await db.execute(stmt_item)).scalar_one()
+
+    normalized_url = body.url.strip() if body.url is not None else None
+    wants_update_global = any(
+        v is not None
+        for v in (
+            body.title,
+            normalized_url,
+            body.price,
+            body.currency,
+            body.image_url,
+        )
+    )
+
+    if wants_update_global:
+        # If the item is used in other wishlists, keep it immutable there:
+        # create (or reuse) a separate Item and re-link this wishlist item.
+        cnt_stmt = select(func.count()).select_from(WishlistItem).where(WishlistItem.item_id == item.id)
+        cnt = int((await db.execute(cnt_stmt)).scalar_one())
+
+        next_title = body.title if body.title is not None else item.title
+        next_url = normalized_url if normalized_url is not None else item.url
+        next_price = body.price if body.price is not None else item.price
+        next_currency = body.currency if body.currency is not None else item.currency
+        next_image_url = body.image_url if body.image_url is not None else item.image_url
+
+        if cnt > 1:
+            existing = (await db.execute(select(Item).where(Item.url == next_url))).scalar_one_or_none()
+            target_item = existing
+            if target_item is None:
+                target_item = Item(
+                    url=next_url,
+                    title=next_title,
+                    price=next_price,
+                    currency=next_currency,
+                    image_url=next_image_url,
+                )
+                db.add(target_item)
+                await db.flush()
+
+            wi.item_id = target_item.id
+            item = target_item
+        else:
+            item.title = next_title
+            item.url = next_url
+            item.price = next_price
+            item.currency = next_currency
+            item.image_url = next_image_url
+
     if body.note is not None:
         wi.note = body.note
     if body.priority is not None:
@@ -248,11 +308,13 @@ async def update_item(
     if body.is_purchased is not None:
         wi.is_purchased = body.is_purchased
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Item already in this wishlist")
     await db.refresh(wi)
-
-    stmt_item = select(Item).where(Item.id == item_id)
-    item = (await db.execute(stmt_item)).scalar_one()
+    await db.refresh(item)
 
     return WishlistItemOut(
         id=item.id,

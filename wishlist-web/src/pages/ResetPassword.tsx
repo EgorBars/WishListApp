@@ -151,7 +151,7 @@ const ResetPassword = () => {
               value={password}
               error={passwordError}
               onChange={(e) => {
-                setPassword(e.target.value);
+                setPassword(e.target.value.replace(/\s+/g, ''));
                 if (passwordError) setPasswordError('');
               }}
               onBlur={() => setPasswordError(validateNewPassword(password) ?? '')}
@@ -165,7 +165,7 @@ const ResetPassword = () => {
               value={confirm}
               error={confirmError}
               onChange={(e) => {
-                setConfirm(e.target.value);
+                setConfirm(e.target.value.replace(/\s+/g, ''));
                 if (confirmError) setConfirmError('');
               }}
               onBlur={() =>

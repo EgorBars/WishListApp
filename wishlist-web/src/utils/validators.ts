@@ -28,12 +28,14 @@ export function validateForgotEmail(value: string): string | null {
 
 export function validatePasswordAuth(value: string): string | null {
   if (!value) return MSG.passwordRequired;
+  if (/\s/.test(value)) return 'Пароль не должен содержать пробелы';
   if (value.length < 8 || value.length > 50) return MSG.passwordLength;
   return null;
 }
 
 export function validateNewPassword(value: string): string | null {
   if (!value) return MSG.passwordRequired;
+  if (/\s/.test(value)) return 'Пароль не должен содержать пробелы';
   if (value.length < 8 || value.length > 50) return MSG.passwordLength;
   return null;
 }

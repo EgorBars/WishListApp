@@ -28,7 +28,9 @@ const Register = () => {
       validateEmailRequired(email) === null &&
       validatePasswordAuth(password) === null &&
       password === confirmPassword &&
-      confirmPassword.length > 0
+      confirmPassword.length > 0 &&
+      email.length <= 255 &&
+      password.length <= 50
     );
   }, [email, password, confirmPassword]);
 
@@ -97,7 +99,11 @@ const Register = () => {
               placeholder="ivan@example.com"
               value={email}
               error={emailError}
-              onChange={(e) => setEmail(e.target.value)}
+              maxLength={255} // Ограничение по спецификации БД
+              onChange={(e) => {
+                setEmail(e.target.value.replace(/\s+/g, ''));
+                if (emailError) setEmailError('');
+              }}
               onBlur={() => {
                 touch('email');
                 setEmailError(validateEmailRequired(email) ?? '');
@@ -108,13 +114,15 @@ const Register = () => {
             <Input
               label="Пароль"
               type="password"
-              minLength={8}
-              maxLength={50}
               autoComplete="new-password"
               placeholder="Минимум 8 символов"
               value={password}
               error={passwordError}
-              onChange={(e) => setPassword(e.target.value)}
+              maxLength={50} // Ограничение по спецификации (8-50)
+              onChange={(e) => {
+                setPassword(e.target.value.replace(/\s+/g, ''));
+                if (passwordError) setPasswordError('');
+              }}
               onBlur={() => {
                 touch('password');
                 setPasswordError(validatePasswordAuth(password) ?? '');
@@ -125,12 +133,15 @@ const Register = () => {
             <Input
               label="Подтвердите пароль"
               type="password"
-              maxLength={50}
               autoComplete="off"
               placeholder="Повторите пароль"
               value={confirmPassword}
               error={confirmError}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              maxLength={50} // Совпадает с ограничением пароля
+              onChange={(e) => {
+                setConfirmPassword(e.target.value.replace(/\s+/g, ''));
+                if (confirmError) setConfirmError('');
+              }}
               onBlur={() => touch('confirm')}
               disabled={isLoading}
             />

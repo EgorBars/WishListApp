@@ -37,7 +37,7 @@ export async function addWishlistItem(
     title: string;
     url: string;
     price: number;
-    currency?: 'RUB' | 'USD' | 'EUR';
+    currency?: 'BYN' | 'USD' | 'EUR';
     image_url?: string | null;
     priority?: number;
     note?: string | null;

@@ -50,7 +50,7 @@ class Item(Base):
     url: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
-    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="RUB")
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="BYN")
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
