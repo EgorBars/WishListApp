@@ -99,9 +99,15 @@ const Register = () => {
               placeholder="ivan@example.com"
               value={email}
               error={emailError}
-              maxLength={255} // Ограничение по спецификации БД
+              maxLength={255}
+              // 1. Блокируем нажатие пробела
+              onKeyDown={(e) => {
+                if (e.key === ' ') e.preventDefault();
+              }}
+              // 2. Вырезаем пробелы при вводе/вставке
               onChange={(e) => {
-                setEmail(e.target.value.replace(/\s+/g, ''));
+                const valueWithoutSpaces = e.target.value.replace(/\s/g, '');
+                setEmail(valueWithoutSpaces);
                 if (emailError) setEmailError('');
               }}
               onBlur={() => {

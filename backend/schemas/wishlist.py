@@ -72,9 +72,9 @@ class WishlistItemCreate(BaseModel):
 
 class WishlistItemUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
-    url: str | None = Field(default=None, min_length=1, max_length=2000)
+    url: str | None = Field(default=None, max_length=2000)
     price: Decimal | None = Field(default=None, ge=0)
-    currency: Literal["BYN", "USD", "EUR"] | None = None
+    currency: str | None = None
     image_url: str | None = Field(default=None, max_length=2000)
     note: str | None = Field(default=None, max_length=500)
     priority: int | None = Field(default=None, ge=1, le=5)
