@@ -8,7 +8,11 @@ import { Button } from '../components/common/Button';
 import { Modal } from '../components/common/Modal';
 import { Input } from '../components/common/Input';
 import { Textarea } from '../components/common/Textarea';
+import { InputSkeleton } from '../components/common/InputSkeleton';
+import { Toast } from '../components/common/Toast';
+import { Spinner } from '../components/common/Spinner';
 import { Wishlist, WishlistItem } from '../types';
+import { useItemParsing } from '../hooks/useItemParsing';
 import api from '../api/axiosInstance';
 
 const WishlistDetail = () => {
@@ -38,7 +42,39 @@ const WishlistDetail = () => {
     note: ''
   });
 
-  const [saving, setSaving] = useState(false); // <-- Добавляем сюда
+  const [saving, setSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [userModifiedFields, setUserModifiedFields] = useState<Set<keyof typeof itemForm>>(new Set());
+
+  // Хук для парсинга товаров по URL
+  const { 
+    isParsing, 
+    error: parsingError, 
+    handleUrlInputChange, 
+    handleUrlPaste,
+    handleUrlBlur,
+    resetSession 
+  } = useItemParsing({
+    onSuccess: (data) => {
+      // Коллизии: игнорируем поля, которые пользователь уже заполнил
+      if (!userModifiedFields.has('title') && data.title) {
+        setItemForm(prev => ({ ...prev, title: data.title as string }));
+      }
+      if (!userModifiedFields.has('price') && data.price !== null) {
+        setItemForm(prev => ({ ...prev, price: data.price!.toString() }));
+      }
+      if (!userModifiedFields.has('image_url') && data.image_url) {
+        setItemForm(prev => ({ ...prev, image_url: data.image_url as string }));
+      }
+      // Валюта устанавливается всегда (региональная адаптция)
+      if (data.currency) {
+        setItemForm(prev => ({ ...prev, currency: data.currency }));
+      }
+    },
+    onError: (error) => {
+      setToastMessage(error);
+    },
+  });
 
   // Валидация URL (обязательное поле)
   const isValidUrl = (url: string) => {
@@ -87,6 +123,40 @@ const WishlistDetail = () => {
     if (value.startsWith('.')) value = '0' + value;
     if (value !== '' && !/^\d*\.?\d{0,2}$/.test(value)) return;
     setItemForm({ ...itemForm, price: value });
+    // Отслеживаем, что пользователь вручную ввел цену
+    setUserModifiedFields(prev => new Set([...prev, 'price']));
+  };
+
+  // Обработчик для URL поля: debounce-ввод, paste, blur события
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newUrl = e.target.value;
+    setItemForm({ ...itemForm, url: newUrl });
+    // Debounce на 800мс (без отслеживания как пользовательское действие)
+    handleUrlInputChange(newUrl);
+  };
+
+  const handleUrlPasteEvent = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedUrl = e.clipboardData.getData('text');
+    if (pastedUrl.trim()) {
+      // Мгновенно парсим при вставке (без debounce)
+      handleUrlPaste(pastedUrl);
+    }
+  };
+
+  const handleUrlBlurEvent = () => {
+    // Парсим если URL изменился и прошел валидацию
+    handleUrlBlur(itemForm.url);
+  };
+
+  // Обработчики для отслеживания пользовательского ввода в другие поля
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setItemForm({ ...itemForm, title: e.target.value });
+    setUserModifiedFields(prev => new Set([...prev, 'title']));
+  };
+
+  const handleImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setItemForm({ ...itemForm, image_url: e.target.value });
+    setUserModifiedFields(prev => new Set([...prev, 'image_url']));
   };
 
   const openEditList = () => {
@@ -94,6 +164,23 @@ const WishlistDetail = () => {
       setListForm({ title: list.title, description: list.description || '', is_public: list.is_public });
       setIsEditListOpen(true);
     }
+  };
+
+  // Открытие модального окна для добавления товара
+  const openItemModal = () => {
+    setEditingItem(null);
+    setItemForm({ title: '', url: '', price: '', currency: 'BYN', image_url: '', priority: 3, note: '' });
+    setUserModifiedFields(new Set());
+    resetSession(); // Сбрасываем список обработанных URLs
+    setIsItemModalOpen(true);
+  };
+
+  // Закрытие модального окна
+  const closeItemModal = () => {
+    setIsItemModalOpen(false);
+    setEditingItem(null);
+    setUserModifiedFields(new Set());
+    resetSession();
   };
 
   const handleUpdateList = async () => {
@@ -214,7 +301,7 @@ const WishlistDetail = () => {
               <button onClick={() => setFilter('purchased')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === 'purchased' ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Куплено</button>
            </div>
         </div>
-        <Button onClick={() => { setEditingItem(null); setItemForm({title:'', url:'', price:'', currency:'BYN', image_url:'', priority:3, note:''}); setIsItemModalOpen(true); }} className="w-full sm:w-auto py-2.5 px-6 flex gap-2 h-11 shadow-md">
+        <Button onClick={openItemModal} className="w-full sm:w-auto py-2.5 px-6 flex gap-2 h-11 shadow-md">
           <Plus size={18} /> Добавить подарок
         </Button>
       </div>
@@ -262,6 +349,8 @@ const WishlistDetail = () => {
                 <button onClick={() => {
                    setEditingItem(item);
                    setItemForm({title: item.title, url: item.url || '', price: item.price.toString(), currency: item.currency, image_url: item.image_url || '', priority: item.priority, note: item.note || ''});
+                   setUserModifiedFields(new Set());
+                   resetSession();
                    setIsItemModalOpen(true);
                 }} className="p-2.5 text-gray-400 hover:text-brand-primary hover:bg-indigo-50 rounded-xl transition-all"><Edit2 size={18} /></button>
                 <button
@@ -292,63 +381,131 @@ const WishlistDetail = () => {
         </div>
       </Modal>
 
-      <Modal isOpen={isItemModalOpen} onClose={() => { setIsItemModalOpen(false); setEditingItem(null); }} title={editingItem ? "Изменить товар" : "Новый подарок"}>
+      <Modal isOpen={isItemModalOpen} onClose={closeItemModal} title={editingItem ? "Изменить товар" : "Новый подарок"}>
         <div className="space-y-4">
-          <Input
-            label="Название *"
-            placeholder="Что подарить?"
-            value={itemForm.title}
-            maxLength={255}
-            onChange={e => setItemForm({...itemForm, title: e.target.value})}
-          />
-          
-          <Input 
-            label="Ссылка на товар *"
-            placeholder="https://..." 
-            value={itemForm.url} 
-            error={!itemForm.url.trim() ? 'Ссылка обязательна' : (!isValidUrl(itemForm.url) ? 'Неверный формат ссылки' : '')}
-            onChange={e => setItemForm({...itemForm, url: e.target.value})} 
-          />
-          
-          <Input 
-            label="Ссылка на фото (опционально)" 
-            placeholder="https://... (прямая ссылка на фото)" 
-            value={itemForm.image_url} 
-            error={itemForm.image_url && !isValidUrl(itemForm.image_url) ? 'Неверный формат ссылки' : ''}
-            onChange={e => setItemForm({...itemForm, image_url: e.target.value})} 
-          />
-          
-          <div className="grid grid-cols-2 gap-4">
+          {/* Название */}
+          {isParsing && userModifiedFields.size === 0 ? (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-bold text-gray-700 ml-1">Название *</label>
+              <InputSkeleton height="md" />
+            </div>
+          ) : (
             <Input
-              label="Цена *"
-              type="number"
-              placeholder="0.00"
-              value={itemForm.price}
-              onKeyDown={handlePriceKeyDown}
-              onChange={handlePriceChange}
+              label="Название *"
+              placeholder="Что подарить?"
+              value={itemForm.title}
+              maxLength={255}
+              onChange={handleTitleChange}
             />
+          )}
+          
+          {/* URL с логикой парсинга */}
+          <div className="space-y-1.5">
+            <label className="block text-sm font-bold text-gray-700 ml-1">Ссылка на товар *</label>
+            <div className="relative">
+              <input 
+                type="text"
+                placeholder="https://..."
+                value={itemForm.url}
+                onChange={handleUrlChange}
+                onPaste={handleUrlPasteEvent}
+                onBlur={handleUrlBlurEvent}
+                disabled={isParsing}
+                className={`w-full px-4 py-3 rounded-2xl border outline-none transition-all
+                  ${isParsing ? 'bg-gray-50 text-gray-400 border-gray-100' : 'bg-white border-gray-200 focus:ring-4 focus:ring-indigo-50'}
+                  ${parsingError ? 'border-red-200 focus:ring-red-100' : ''}
+                `}
+              />
+              {isParsing && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Spinner size="sm" />
+                </div>
+              )}
+            </div>
+            {parsingError && (
+              <p className="text-xs text-red-500 ml-1">{parsingError}</p>
+            )}
+          </div>
+          
+          {/* Фото с loading skeleton */}
+          {isParsing && userModifiedFields.size === 0 ? (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-bold text-gray-700 ml-1">Ссылка на фото (опционально)</label>
+              <InputSkeleton height="md" />
+            </div>
+          ) : (
+            <Input 
+              label="Ссылка на фото (опционально)" 
+              placeholder="https://... (прямая ссылка на фото)" 
+              value={itemForm.image_url} 
+              error={itemForm.image_url && !isValidUrl(itemForm.image_url) ? 'Неверный формат ссылки' : ''}
+              onChange={handleImageUrlChange} 
+            />
+          )}
+          
+          {/* Цена и валюта */}
+          <div className="grid grid-cols-2 gap-4">
+            {isParsing && userModifiedFields.size === 0 ? (
+              <div className="space-y-1.5">
+                <label className="block text-sm font-bold text-gray-700 ml-1">Цена *</label>
+                <InputSkeleton height="md" />
+              </div>
+            ) : (
+              <Input
+                label="Цена *"
+                type="number"
+                placeholder="0.00"
+                value={itemForm.price}
+                onKeyDown={handlePriceKeyDown}
+                onChange={handlePriceChange}
+              />
+            )}
             <div className="space-y-1.5">
               <label className="block text-sm font-bold text-gray-700 ml-1">Валюта</label>
-              <select className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-indigo-50 bg-white cursor-pointer" value={itemForm.currency} onChange={e => setItemForm({...itemForm, currency: e.target.value})}>
-                <option value="BYN">BYN</option><option value="USD">USD</option><option value="EUR">EUR</option>
+              <select 
+                className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-indigo-50 bg-white cursor-pointer"
+                value={itemForm.currency}
+                onChange={e => setItemForm({...itemForm, currency: e.target.value})}
+              >
+                <option value="BYN">BYN</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
               </select>
             </div>
           </div>
           
+          {/* Приоритет */}
           <div className="space-y-1.5">
             <label className="block text-sm font-bold text-gray-700 ml-1">Приоритет</label>
-            <select className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-indigo-50 bg-white cursor-pointer" value={itemForm.priority} onChange={e => setItemForm({...itemForm, priority: Number(e.target.value)})}>
-              <option value="1">1 — Низкий</option><option value="2">2 — Ниже среднего</option><option value="3">3 — Средний</option><option value="4">4 — Высокий</option><option value="5">5 — Максимальный</option>
+            <select 
+              className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-indigo-50 bg-white cursor-pointer" 
+              value={itemForm.priority} 
+              onChange={e => setItemForm({...itemForm, priority: Number(e.target.value)})}
+            >
+              <option value="1">1 — Низкий</option>
+              <option value="2">2 — Ниже среднего</option>
+              <option value="3">3 — Средний</option>
+              <option value="4">4 — Высокий</option>
+              <option value="5">5 — Максимальный</option>
             </select>
           </div>
           
-          <Textarea label="Комментарий (опционально)" placeholder="Цвет, размер и т.д." className="h-24" maxLength={500} value={itemForm.note} onChange={e => setItemForm({...itemForm, note: e.target.value})} />
+          {/* Комментарий */}
+          <Textarea 
+            label="Комментарий (опционально)" 
+            placeholder="Цвет, размер и т.д." 
+            className="h-24" 
+            maxLength={500} 
+            value={itemForm.note} 
+            onChange={e => setItemForm({...itemForm, note: e.target.value})} 
+          />
           
+          {/* Кнопка сохранения с loading состоянием */}
           <Button
             onClick={handleSaveItem}
-            disabled={!isItemFormValid || saving} // Кнопка неактивна, если форма невалидна ИЛИ идет сохранение
-            isLoading={saving}                    // Показывает спиннер внутри кнопки
-            >
+            disabled={!isItemFormValid || saving || isParsing}
+            isLoading={saving}
+          >
             {editingItem ? "Сохранить" : "Добавить"}
           </Button>
         </div>
@@ -402,6 +559,9 @@ const WishlistDetail = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Toast для уведомления об ошибке парсинга */}
+      {toastMessage && <Toast message={toastMessage} type="error" onClose={() => setToastMessage(null)} />}
     </div>
   );
 };
