@@ -10,6 +10,7 @@ import { Input } from '../components/common/Input';
 import { Textarea } from '../components/common/Textarea';
 import { InputSkeleton } from '../components/common/InputSkeleton';
 import { Toast } from '../components/common/Toast';
+import { ErrorModal } from '../components/common/ErrorModal';
 import { Spinner } from '../components/common/Spinner';
 import { Wishlist, WishlistItem } from '../types';
 import { useItemParsing } from '../hooks/useItemParsing';
@@ -45,6 +46,7 @@ const WishlistDetail = () => {
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [userModifiedFields, setUserModifiedFields] = useState<Set<keyof typeof itemForm>>(new Set());
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Хук для парсинга товаров по URL
   const { 
@@ -189,7 +191,10 @@ const WishlistDetail = () => {
       await api.put(`/wishlists/${id}`, listForm);
       setIsEditListOpen(false);
       fetchData();
-    } catch (e) { alert("Ошибка обновления списка"); }
+    } catch (e: any) {
+      const serverError = e.response?.data?.detail || "Ошибка обновления списка";
+      setErrorMessage(serverError);
+    }
   };
 
   const handleSaveItem = async () => {
@@ -226,7 +231,7 @@ const WishlistDetail = () => {
       console.error("Save error:", e);
       // Если это ошибка валидации или конфликт (409), выводим текст ошибки от сервера
       const serverError = e.response?.data?.detail;
-      alert(serverError || "Ошибка при сохранении товара. Попробуйте еще раз.");
+      setErrorMessage(serverError || "Ошибка при сохранении товара. Попробуйте еще раз.");
     } finally {
       setSaving(false); // Выключаем индикатор в любом случае
     }
@@ -248,7 +253,10 @@ const WishlistDetail = () => {
     try {
       await api.delete(`/wishlists/${id}/items/${itemId}`);
       fetchData();
-    } catch (e) { alert("Ошибка удаления"); }
+    } catch (e: any) {
+      const serverError = e.response?.data?.detail || "Ошибка удаления товара";
+      setErrorMessage(serverError);
+    }
   };
 
   const handleDeleteList = async () => {
@@ -562,6 +570,13 @@ const WishlistDetail = () => {
 
       {/* Toast для уведомления об ошибке парсинга */}
       {toastMessage && <Toast message={toastMessage} type="error" onClose={() => setToastMessage(null)} />}
+
+      {/* Модальное окно ошибки */}
+      <ErrorModal 
+        isOpen={errorMessage !== null} 
+        message={errorMessage || ''} 
+        onClose={() => setErrorMessage(null)} 
+      />
     </div>
   );
 };
