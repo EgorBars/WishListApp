@@ -16,3 +16,17 @@ def register_forgot_attempt(email: str) -> bool:
         return False
     attempts.append(now)
     return True
+
+_parse_attempts: dict[str, list[float]] = defaultdict(list)
+PARSE_WINDOW_SEC = 60
+PARSE_MAX_PER_WINDOW = 10
+
+def register_parse_attempt(user_id: str) -> bool:
+    now = time()
+    window_start = now - PARSE_WINDOW_SEC
+    attempts = _parse_attempts[user_id]
+    attempts[:] = [t for t in attempts if t > window_start]
+    if len(attempts) >= PARSE_MAX_PER_WINDOW:
+        return False
+    attempts.append(now)
+    return True

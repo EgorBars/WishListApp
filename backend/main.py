@@ -4,7 +4,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import get_settings
-from routers import auth, users, wishlists
+from routers import auth, users, wishlists, items
 
 logger = logging.getLogger("wishlist_app")
 
@@ -28,5 +28,6 @@ api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(auth.router)
 api_v1.include_router(users.router)
 api_v1.include_router(wishlists.router)
+api_v1.include_router(items.router)
 
 app.include_router(api_v1)
