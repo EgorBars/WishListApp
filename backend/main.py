@@ -6,7 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import get_settings
 from routers import auth, users, wishlists, items
 
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 logger = logging.getLogger("wishlist_app")
+# Set DEBUG level for scraper too
+logging.getLogger("core.scraper").setLevel(logging.DEBUG)
 
 settings = get_settings()
 
