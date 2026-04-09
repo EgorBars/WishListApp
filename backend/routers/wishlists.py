@@ -185,6 +185,17 @@ async def add_item(
         )
         db.add(item)
         await db.flush()
+    else:
+        # Update existing item with new data if different
+        if item.title != body.title:
+            item.title = body.title
+        if item.price != body.price:
+            item.price = body.price
+        if item.currency != body.currency:
+            item.currency = body.currency
+        if item.image_url != body.image_url:
+            item.image_url = body.image_url
+        await db.flush()
 
     link_check = await db.execute(
         select(WishlistItem).where(
