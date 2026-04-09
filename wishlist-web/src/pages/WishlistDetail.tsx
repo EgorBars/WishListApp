@@ -140,7 +140,8 @@ const WishlistDetail = () => {
   const handleUrlPasteEvent = (e: React.ClipboardEvent<HTMLInputElement>) => {
     const pastedUrl = e.clipboardData.getData('text');
     if (pastedUrl.trim()) {
-      // Мгновенно парсим при вставке (без debounce)
+      // Обновляем состояние URL и сразу парсим (без debounce)
+      setItemForm({ ...itemForm, url: pastedUrl });
       handleUrlPaste(pastedUrl);
     }
   };
