@@ -36,7 +36,8 @@ class TokenData(BaseModel):
 
 
 class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
+    # ТЗ: Формат email, длина от 8 до 255
+    email: EmailStr = Field(..., min_length=8, max_length=255)
 
 
 class ForgotPasswordResponse(BaseModel):
@@ -44,8 +45,8 @@ class ForgotPasswordResponse(BaseModel):
 
 
 class ResetPasswordRequest(BaseModel):
-    token: str = Field(min_length=1)
-    new_password: str = Field(min_length=8, max_length=50)
+    token: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=50)
 
 
 class ResetPasswordResponse(BaseModel):
