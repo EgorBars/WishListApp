@@ -8,18 +8,18 @@ from passlib.context import CryptContext
 from core.config import get_settings
 from schemas.user import TokenData
 
-BCRYPT_ROUNDS = 12
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+# Используем pbkdf2_sha256 вместо bcrypt для стабильности в Docker и на новых Python
+# Измените строку pwd_context на эту:
+pwd_context = CryptContext(
+    schemes=["pbkdf2_sha256", "bcrypt"], 
+    deprecated="auto"
+)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password, rounds=BCRYPT_ROUNDS)
-
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     settings = get_settings()
@@ -37,7 +37,6 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
     }
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 
-
 def create_reset_password_token(user_id: UUID) -> str:
     settings = get_settings()
     now = datetime.now(timezone.utc)
@@ -49,7 +48,6 @@ def create_reset_password_token(user_id: UUID) -> str:
         "iat": int(now.timestamp()),
     }
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
-
 
 def decode_access_token(token: str) -> TokenData:
     settings = get_settings()
@@ -63,7 +61,6 @@ def decode_access_token(token: str) -> TokenData:
     except JWTError:
         return TokenData(sub=None, token_type=None)
 
-
 def decode_reset_token(token: str) -> dict[str, Any] | None:
     settings = get_settings()
     try:
@@ -73,3 +70,13 @@ def decode_reset_token(token: str) -> dict[str, Any] | None:
         return payload
     except JWTError:
         return None
+
+
+
+
+
+
+
+
+
+
