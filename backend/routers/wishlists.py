@@ -206,7 +206,7 @@ async def add_item(
     if link_check.scalar_one_or_none() is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Item already in this wishlist",
+            detail="Товар уже добавлен в этот список",
         )
 
     wi = WishlistItem(
@@ -224,7 +224,7 @@ async def add_item(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Item already in this wishlist",
+            detail="Товар уже добавлен в этот список",
         )
     await db.refresh(wi)
     await db.refresh(item)
