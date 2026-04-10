@@ -477,6 +477,7 @@ const WishlistDetail = () => {
                 onChange={e => setItemForm({...itemForm, currency: e.target.value})}
               >
                 <option value="BYN">BYN</option>
+                <option value="RUB">RUB</option>
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
               </select>

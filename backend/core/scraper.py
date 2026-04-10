@@ -145,32 +145,50 @@ class ScraperService:
 
     async def _parse_generic(self, url: str) -> dict:
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-            try:
-                resp = await client.get(url, headers=self.headers)
-                if resp.status_code != 200:
-                    logger.warning(f"Wrong status code {resp.status_code} for {url}")
-                    return {"url": url, "currency": "BYN"}
-
-                html = resp.text
-                soup = BeautifulSoup(html, "lxml")
-
-                title = self._get_title(soup)
-                price = self._get_price(soup)
-                image_url = self._get_image(soup, url)
-                
-                logger.info(f"Parsed {url}: title={title}, price={price}, image={image_url is not None}")
-
-                result = {
-                    "title": title,
-                    "price": price,
-                    "currency": "BYN",
-                    "image_url": image_url,
-                    "url": url
-                }
-                return result
-            except Exception as e:
-                logger.error(f"Error parsing {url}: {str(e)}", exc_info=True)
+            resp = await client.get(url, headers=self.headers)
+            if resp.status_code != 200:
                 return {"url": url, "currency": "BYN"}
+
+            html = resp.text
+            soup = BeautifulSoup(html, "lxml")
+
+            # Пытаемся определить валюту
+            currency = self._get_currency(soup) or "BYN"
+
+            result = {
+                "title": self._get_title(soup),
+                "price": self._get_price(soup),
+                "currency": currency,
+                "image_url": self._get_image(soup, url),
+                "url": url
+            }
+            return result
+
+    def _get_currency(self, soup: BeautifulSoup) -> Optional[str]:
+        # 1. Ищем в OpenGraph
+        og_curr = soup.find("meta", property="og:price:currency") or \
+                  soup.find("meta", property="product:price:currency")
+        if og_curr:
+            curr = og_curr.get("content")
+            if curr: return curr.upper()
+
+        # 2. Ищем в JSON-LD
+        for script in soup.find_all("script", type="application/ld+json"):
+            try:
+                data = json.loads(script.string)
+                # JSON-LD может быть списком или словарем
+                items = data if isinstance(data, list) else [data]
+                for item in items:
+                    offers = item.get("offers")
+                    if isinstance(offers, dict):
+                        curr = offers.get("priceCurrency")
+                        if curr: return curr.upper()
+                    elif isinstance(offers, list):
+                        curr = offers[0].get("priceCurrency")
+                        if curr: return curr.upper()
+            except:
+                continue
+        return None
 
     def _get_title(self, soup: BeautifulSoup) -> Optional[str]:
         logger.debug("=" * 80)
