@@ -1,4 +1,10 @@
-import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  Navigate,
+  Outlet,
+  RouterProvider,
+  useLocation,
+} from 'react-router-dom';
 import { Navbar } from './components/common/Navbar';
 import { PrivateRoute } from './components/auth/PrivateRoute';
 import { PublicRoute } from './components/auth/PublicRoute';
@@ -7,11 +13,15 @@ import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import WishlistDetail from './pages/WishlistDetail';
+import SharedView from './pages/SharedView';
 
 function RootLayout() {
+  const location = useLocation();
+  const isSharedRoute = location.pathname.startsWith('/shared/');
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
+      {!isSharedRoute ? <Navbar /> : null}
       <Outlet />
     </div>
   );
@@ -39,6 +49,7 @@ const router = createBrowserRouter([
         ),
       },
       { path: 'reset-password', element: <ResetPassword /> },
+      { path: 'shared/:publicId', element: <SharedView /> },
       {
         path: 'dashboard',
         element: (

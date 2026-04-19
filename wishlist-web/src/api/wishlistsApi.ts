@@ -1,13 +1,27 @@
 import api from './axiosInstance';
-import type { Wishlist, WishlistItem, WishlistSummary } from '../types';
+import type {
+  PublicWishlist,
+  ReservationPayload,
+  ReservationResponse,
+  ShareLinkResponse,
+  Wishlist,
+  WishlistItem,
+  WishlistSummary,
+} from '../types';
 
-export async function fetchWishlists(): Promise<WishlistSummary[]> {
-  const { data } = await api.get<WishlistSummary[]>('/wishlists');
+export async function fetchWishlists(signal?: AbortSignal): Promise<WishlistSummary[]> {
+  const { data } = await api.get<WishlistSummary[]>('/wishlists', { signal });
   return data;
 }
 
-export async function fetchWishlist(id: string): Promise<Wishlist> {
-  const { data } = await api.get<Wishlist>(`/wishlists/${id}`);
+export async function fetchWishlist(
+  id: string,
+  options?: { show_all?: boolean; signal?: AbortSignal },
+): Promise<Wishlist> {
+  const { data } = await api.get<Wishlist>(`/wishlists/${id}`, {
+    params: options?.show_all ? { show_all: true } : undefined,
+    signal: options?.signal,
+  });
   return data;
 }
 
@@ -50,7 +64,16 @@ export async function addWishlistItem(
 export async function updateWishlistItem(
   wishlistId: string,
   itemId: string,
-  body: { note?: string | null; priority?: number; is_purchased?: boolean },
+  body: {
+    title?: string;
+    url?: string;
+    price?: number;
+    currency?: 'BYN' | 'USD' | 'EUR';
+    image_url?: string | null;
+    note?: string | null;
+    priority?: number;
+    is_purchased?: boolean;
+  },
 ): Promise<WishlistItem> {
   const { data } = await api.put<WishlistItem>(`/wishlists/${wishlistId}/items/${itemId}`, body);
   return data;
@@ -60,11 +83,36 @@ export async function deleteWishlistItem(wishlistId: string, itemId: string): Pr
   await api.delete(`/wishlists/${wishlistId}/items/${itemId}`);
 }
 
-/**
- * Parse item metadata from URL (title, price, image)
- * Endpoint: POST /api/v1/items/parse
- * Returns partial success (nullable fields) for graceful fallback
- */
+export async function getShareLink(
+  wishlistId: string,
+  signal?: AbortSignal,
+): Promise<ShareLinkResponse> {
+  const { data } = await api.get<ShareLinkResponse>(`/wishlists/${wishlistId}/share`, { signal });
+  return data;
+}
+
+export async function getPublicWishlist(
+  publicId: string,
+  signal?: AbortSignal,
+): Promise<PublicWishlist> {
+  const { data } = await api.get<PublicWishlist>(`/public/wishlists/${publicId}`, { signal });
+  return data;
+}
+
+export async function reserveItem(
+  publicId: string,
+  itemId: string,
+  payload: ReservationPayload,
+  signal?: AbortSignal,
+): Promise<ReservationResponse> {
+  const { data } = await api.post<ReservationResponse>(
+    `/public/wishlists/${publicId}/items/${itemId}/reserve`,
+    payload,
+    { signal },
+  );
+  return data;
+}
+
 export interface ParsedItemData {
   title: string | null;
   price: number | null;

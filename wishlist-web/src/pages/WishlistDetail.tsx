@@ -1,220 +1,275 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, Trash2, Plus, ExternalLink, 
-  CheckCircle2, Circle, Gift, Edit2, Star, MessageSquare, ImageIcon 
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Circle,
+  Edit2,
+  ExternalLink,
+  Gift,
+  ImageIcon,
+  Link2,
+  MessageSquare,
+  Plus,
+  Star,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
-import { Modal } from '../components/common/Modal';
 import { Input } from '../components/common/Input';
+import { Modal } from '../components/common/Modal';
 import { Textarea } from '../components/common/Textarea';
 import { InputSkeleton } from '../components/common/InputSkeleton';
-import { Toast } from '../components/common/Toast';
-import { ErrorModal } from '../components/common/ErrorModal';
 import { Spinner } from '../components/common/Spinner';
-import { Wishlist, WishlistItem } from '../types';
+import { ErrorModal } from '../components/common/ErrorModal';
 import { useItemParsing } from '../hooks/useItemParsing';
-import api from '../api/axiosInstance';
+import { useToast } from '../context/ToastContext';
+import { isValidHttpUrl } from '../utils/validators';
+import {
+  addWishlistItem,
+  deleteWishlist,
+  deleteWishlistItem,
+  fetchWishlist,
+  getShareLink,
+  updateWishlist,
+  updateWishlistItem,
+} from '../api/wishlistsApi';
+import type { Wishlist, WishlistItem } from '../types';
 
-const WishlistDetail = () => {
-  const { id } = useParams<{ id: string }>();
+type ItemFilter = 'all' | 'free' | 'reserved' | 'purchased';
+
+const initialItemForm = {
+  title: '',
+  url: '',
+  price: '' as string | number,
+  currency: 'BYN' as 'BYN' | 'USD' | 'EUR',
+  image_url: '',
+  priority: 3,
+  note: '',
+};
+
+function getItemErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+    if (typeof detail === 'string') return detail;
+  }
+  return fallback;
+}
+
+export default function WishlistDetail() {
+  const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  
+  const { showToast } = useToast();
   const [list, setList] = useState<Wishlist | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [filter, setFilter] = useState<'all' | 'active' | 'purchased'>('all');
-  const [isDelListOpen, setIsDelListOpen] = useState(false);
+  const [filter, setFilter] = useState<ItemFilter>('all');
+  const [showReserved, setShowReserved] = useState(false);
   const [isEditListOpen, setIsEditListOpen] = useState(false);
+  const [isDeleteListOpen, setIsDeleteListOpen] = useState(false);
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
-  const [isDelItemOpen, setIsDelItemOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<WishlistItem | null>(null);
-  
-  const [listForm, setListForm] = useState({ title: '', description: '', is_public: false });
-
+  const [isDeleteItemOpen, setIsDeleteItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WishlistItem | null>(null);
-  const [itemForm, setItemForm] = useState({
-    title: '', 
-    url: '', 
-    price: '' as string | number, 
-    currency: 'BYN', 
-    image_url: '', 
-    priority: 3, 
-    note: ''
-  });
-
+  const [itemToDelete, setItemToDelete] = useState<WishlistItem | null>(null);
   const [saving, setSaving] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [userModifiedFields, setUserModifiedFields] = useState<Set<keyof typeof itemForm>>(new Set());
+  const [sharing, setSharing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [listForm, setListForm] = useState({
+    title: '',
+    description: '',
+    is_public: false,
+  });
+  const [itemForm, setItemForm] = useState(initialItemForm);
+  const [userModifiedFields, setUserModifiedFields] = useState<Set<keyof typeof initialItemForm>>(
+    new Set(),
+  );
 
-  // Хук для парсинга товаров по URL
-  const { 
-    isParsing, 
-    error: parsingError, 
-    handleUrlInputChange, 
+  const {
+    isParsing,
+    error: parsingError,
+    handleUrlInputChange,
     handleUrlPaste,
     handleUrlBlur,
-    resetSession 
+    resetSession,
   } = useItemParsing({
     onSuccess: (data) => {
-      // Коллизии: игнорируем поля, которые пользователь уже заполнил
       if (!userModifiedFields.has('title') && data.title) {
-        setItemForm(prev => ({ ...prev, title: data.title as string }));
+        setItemForm((current) => ({ ...current, title: data.title ?? '' }));
       }
       if (!userModifiedFields.has('price') && data.price !== null) {
-        setItemForm(prev => ({ ...prev, price: data.price!.toString() }));
+        setItemForm((current) => ({ ...current, price: String(data.price) }));
       }
       if (!userModifiedFields.has('image_url') && data.image_url) {
-        setItemForm(prev => ({ ...prev, image_url: data.image_url as string }));
+        setItemForm((current) => ({ ...current, image_url: data.image_url ?? '' }));
       }
-      // Валюта устанавливается всегда (региональная адаптция)
-      if (data.currency) {
-        setItemForm(prev => ({ ...prev, currency: data.currency }));
+      if (data.currency === 'BYN' || data.currency === 'USD' || data.currency === 'EUR') {
+        setItemForm((current) => ({ ...current, currency: data.currency }));
       }
     },
-    onError: (error) => {
-      setToastMessage(error);
+    onError: (message) => {
+      showToast(message);
     },
   });
 
-  // Валидация URL (обязательное поле)
-  const isValidUrl = (url: string) => {
-    if (!url.trim()) return false;
+  const loadWishlist = useCallback(async (showAll: boolean) => {
+    const controller = new AbortController();
+    setLoading(true);
+
     try {
-      const parsed = new URL(url);
-      return ['http:', 'https:'].includes(parsed.protocol);
-    } catch {
-      return false;
+      const data = await fetchWishlist(id, { show_all: showAll, signal: controller.signal });
+      setList(data);
+      setListForm({
+        title: data.title,
+        description: data.description ?? '',
+        is_public: data.is_public,
+      });
+    } catch (error) {
+      setErrorMessage(getItemErrorMessage(error, 'Не удалось загрузить список'));
+    } finally {
+      setLoading(false);
     }
-  };
 
-  // Валидация всей формы (Название, Ссылка и Цена — обязательны)
-  const isItemFormValid = useMemo(() => {
-    const titleOk = itemForm.title.trim().length > 0;
-    const priceOk = itemForm.price !== '' && !isNaN(Number(itemForm.price));
-    const urlValid = isValidUrl(itemForm.url);
-    const imageValid = !itemForm.image_url.trim() || isValidUrl(itemForm.image_url);
-    
-    return titleOk && priceOk && urlValid && imageValid;
-  }, [itemForm]);
-
-  const fetchData = useCallback(async () => {
-    try {
-      const res = await api.get(`/wishlists/${id}`);
-      setList(res.data);
-    } catch (e) {
-      setList({
-        id: id || '1', title: 'Мой День Рождения', description: 'Список подарков!', is_public: true, items_count: 2, created_at: '2024-03-24T10:00:00Z', updated_at: '',
-        items: [
-          { id: 'i1', title: 'Кроссовки Nike', price: 350, currency: 'BYN', is_purchased: false, priority: 5, url: 'https://nike.com', note: 'Размер 42', added_at: '', wishlist_id: '1', item_id: '1', image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff' },
-          { id: 'i2', title: 'Колонка', price: 150, currency: 'BYN', is_purchased: true, priority: 3, url: 'https://ya.ru', added_at: '', wishlist_id: '1', item_id: '2', image_url: '' }
-        ]
-      } as any);
-    } finally { setLoading(false); }
+    return () => controller.abort();
   }, [id]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    const controller = new AbortController();
 
-  const handlePriceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-  };
-
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-    if (value.startsWith('.')) value = '0' + value;
-    if (value !== '' && !/^\d*\.?\d{0,2}$/.test(value)) return;
-    setItemForm({ ...itemForm, price: value });
-    // Отслеживаем, что пользователь вручную ввел цену
-    setUserModifiedFields(prev => new Set([...prev, 'price']));
-  };
-
-  // Обработчик для URL поля: debounce-ввод, paste, blur события
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newUrl = e.target.value;
-    setItemForm({ ...itemForm, url: newUrl });
-    // Debounce на 800мс (без отслеживания как пользовательское действие)
-    handleUrlInputChange(newUrl);
-  };
-
-  const handleUrlPasteEvent = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const pastedUrl = e.clipboardData.getData('text');
-    if (pastedUrl.trim()) {
-      // Мгновенно парсим при вставке (без debounce)
-      handleUrlPaste(pastedUrl);
+    async function run() {
+      setLoading(true);
+      try {
+        const data = await fetchWishlist(id, { show_all: showReserved, signal: controller.signal });
+        setList(data);
+        setListForm({
+          title: data.title,
+          description: data.description ?? '',
+          is_public: data.is_public,
+        });
+      } catch (error) {
+        setErrorMessage(getItemErrorMessage(error, 'Не удалось загрузить список'));
+      } finally {
+        setLoading(false);
+      }
     }
-  };
 
-  const handleUrlBlurEvent = () => {
-    // Парсим если URL изменился и прошел валидацию
-    handleUrlBlur(itemForm.url);
-  };
+    void run();
+    return () => controller.abort();
+  }, [id, showReserved]);
 
-  // Обработчики для отслеживания пользовательского ввода в другие поля
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setItemForm({ ...itemForm, title: e.target.value });
-    setUserModifiedFields(prev => new Set([...prev, 'title']));
-  };
+  const itemFormValid = useMemo(() => {
+    const titleOk = itemForm.title.trim().length > 0;
+    const priceOk = itemForm.price !== '' && !Number.isNaN(Number(itemForm.price));
+    const urlOk = isValidHttpUrl(itemForm.url);
+    const imageOk = !itemForm.image_url.trim() || isValidHttpUrl(itemForm.image_url);
+    return titleOk && priceOk && urlOk && imageOk;
+  }, [itemForm]);
 
-  const handleImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setItemForm({ ...itemForm, image_url: e.target.value });
-    setUserModifiedFields(prev => new Set([...prev, 'image_url']));
-  };
+  const filteredItems = useMemo(() => {
+    const items = list?.items ?? [];
+    return items.filter((item) => {
+      if (filter === 'free') return !item.is_purchased && !item.is_reserved;
+      if (filter === 'reserved') return Boolean(item.is_reserved);
+      if (filter === 'purchased') return item.is_purchased;
+      return true;
+    });
+  }, [filter, list?.items]);
 
-  const openEditList = () => {
-    if (list) {
-      setListForm({ title: list.title, description: list.description || '', is_public: list.is_public });
-      setIsEditListOpen(true);
-    }
-  };
-
-  // Открытие модального окна для добавления товара
-  const openItemModal = () => {
+  const openCreateItem = () => {
     setEditingItem(null);
-    setItemForm({ title: '', url: '', price: '', currency: 'BYN', image_url: '', priority: 3, note: '' });
+    setItemForm(initialItemForm);
     setUserModifiedFields(new Set());
-    resetSession(); // Сбрасываем список обработанных URLs
+    resetSession();
     setIsItemModalOpen(true);
   };
 
-  // Закрытие модального окна
+  const openEditItem = (item: WishlistItem) => {
+    setEditingItem(item);
+    setItemForm({
+      title: item.title,
+      url: item.url || '',
+      price: String(item.price),
+      currency: item.currency as 'BYN' | 'USD' | 'EUR',
+      image_url: item.image_url || '',
+      priority: item.priority,
+      note: item.note || '',
+    });
+    setUserModifiedFields(new Set());
+    resetSession();
+    setIsItemModalOpen(true);
+  };
+
   const closeItemModal = () => {
     setIsItemModalOpen(false);
     setEditingItem(null);
+    setItemForm(initialItemForm);
     setUserModifiedFields(new Set());
     resetSession();
   };
 
-  const handleUpdateList = async () => {
-    if (!listForm.title.trim()) return;
+  const handleShare = async () => {
+    if (!list) return;
+    setSharing(true);
     try {
-      await api.put(`/wishlists/${id}`, listForm);
-      setIsEditListOpen(false);
-      fetchData();
-    } catch (e: any) {
-      const serverError = e.response?.data?.detail || "Ошибка обновления списка";
-      setErrorMessage(serverError);
+      const response = await getShareLink(list.id);
+      try {
+        await navigator.clipboard.writeText(response.share_url);
+      } catch {
+        showToast('Не удалось скопировать ссылку. Скопируйте её вручную.');
+        return;
+      }
+      setList((current) =>
+        current
+          ? { ...current, is_public: true, public_id: response.public_id, share_url: response.share_url }
+          : current,
+      );
+      showToast('Ссылка скопирована в буфер обмена');
+    } catch {
+      showToast('Не удалось получить ссылку. Попробуйте позже');
+    } finally {
+      setSharing(false);
     }
   };
 
+  const handleUpdateList = async () => {
+    if (!listForm.title.trim() || !list) return;
+    setSaving(true);
+
+    try {
+      const updated = await updateWishlist(list.id, {
+        title: listForm.title.trim(),
+        description: listForm.description.trim() || null,
+        is_public: listForm.is_public,
+      });
+      setList(updated);
+      setIsEditListOpen(false);
+    } catch (error) {
+      setErrorMessage(getItemErrorMessage(error, 'Ошибка обновления списка'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteList = async () => {
+    if (!list) return;
+    await deleteWishlist(list.id);
+    navigate('/dashboard');
+  };
+
   const handleSaveItem = async () => {
-    if (!isItemFormValid) return;
-    setSaving(true); // Включаем индикатор загрузки
+    if (!itemFormValid || !list) return;
+    setSaving(true);
+
     try {
       if (editingItem) {
-        // Редактирование
-        await api.put(`/wishlists/${id}/items/${editingItem.id}`, {
+        await updateWishlistItem(list.id, editingItem.id, {
           title: itemForm.title.trim(),
           url: itemForm.url.trim(),
           price: Number(itemForm.price),
           currency: itemForm.currency,
-          image_url: itemForm.image_url.trim(),
-          note: itemForm.note.trim(),
+          image_url: itemForm.image_url.trim() || null,
           priority: itemForm.priority,
+          note: itemForm.note.trim() || null,
         });
       } else {
-        // Создание нового
-        await api.post(`/wishlists/${id}/items`, {
+        await addWishlistItem(list.id, {
           title: itemForm.title.trim(),
           url: itemForm.url.trim(),
           price: Number(itemForm.price),
@@ -224,256 +279,440 @@ const WishlistDetail = () => {
           note: itemForm.note.trim() || null,
         });
       }
-      setIsItemModalOpen(false);
-      setEditingItem(null);
-      await fetchData(); // Обновляем список после сохранения
-    } catch (e: any) {
-      console.error("Save error:", e);
-      // Если это ошибка валидации или конфликт (409), выводим текст ошибки от сервера
-      const serverError = e.response?.data?.detail;
-      setErrorMessage(serverError || "Ошибка при сохранении товара. Попробуйте еще раз.");
+
+      closeItemModal();
+      await loadWishlist(showReserved);
+    } catch (error) {
+      setErrorMessage(getItemErrorMessage(error, 'Ошибка при сохранении товара'));
     } finally {
-      setSaving(false); // Выключаем индикатор в любом случае
+      setSaving(false);
     }
   };
 
-  const togglePurchased = async (item: WishlistItem) => {
+  const handleTogglePurchased = async (item: WishlistItem) => {
+    if (!list) return;
     try {
-      await api.put(`/wishlists/${id}/items/${item.id}`, { is_purchased: !item.is_purchased });
-      fetchData();
-    } catch (e) {
-      if (list && list.items) {
-        const updated = list.items.map(i => i.id === item.id ? {...i, is_purchased: !i.is_purchased} : i);
-        setList({...list, items: updated});
-      }
+      const updated = await updateWishlistItem(list.id, item.id, {
+        is_purchased: !item.is_purchased,
+      });
+      setList((current) =>
+        current
+          ? {
+              ...current,
+              purchased_count: Math.max(
+                0,
+                (current.purchased_count || 0) + (updated.is_purchased ? 1 : -1),
+              ),
+              items: current.items.map((currentItem) =>
+                currentItem.id === item.id ? { ...currentItem, ...updated } : currentItem,
+              ),
+            }
+          : current,
+      );
+    } catch (error) {
+      setErrorMessage(getItemErrorMessage(error, 'Не удалось обновить статус товара'));
     }
   };
 
-  const handleDeleteItem = async (itemId: string) => {
-    try {
-      await api.delete(`/wishlists/${id}/items/${itemId}`);
-      fetchData();
-    } catch (e: any) {
-      const serverError = e.response?.data?.detail || "Ошибка удаления товара";
-      setErrorMessage(serverError);
-    }
+  const handleDeleteItem = async () => {
+    if (!list || !itemToDelete) return;
+    await deleteWishlistItem(list.id, itemToDelete.id);
+    setList((current) =>
+      current
+        ? {
+            ...current,
+            items_count: Math.max(0, current.items_count - 1),
+            reserved_count: itemToDelete.is_reserved
+              ? Math.max(0, (current.reserved_count || 0) - 1)
+              : current.reserved_count,
+            purchased_count: itemToDelete.is_purchased
+              ? Math.max(0, (current.purchased_count || 0) - 1)
+              : current.purchased_count,
+            items: current.items.filter((item) => item.id !== itemToDelete.id),
+          }
+        : current,
+    );
+    setItemToDelete(null);
+    setIsDeleteItemOpen(false);
   };
 
-  const handleDeleteList = async () => {
-    try { await api.delete(`/wishlists/${id}`); navigate('/dashboard'); } 
-    catch (e) { navigate('/dashboard'); }
+  const handlePriceChange = (value: string) => {
+    let normalized = value;
+    if (normalized.startsWith('.')) normalized = `0${normalized}`;
+    if (normalized !== '' && !/^\d*\.?\d{0,2}$/.test(normalized)) return;
+    setItemForm((current) => ({ ...current, price: normalized }));
+    setUserModifiedFields((current) => new Set([...current, 'price']));
   };
 
-  if (loading) return <div className="text-center mt-20 text-gray-500 font-medium">Загрузка...</div>;
-  if (!list) return null;
+  if (loading) {
+    return <div className="mt-20 text-center text-gray-500">Загрузка списка...</div>;
+  }
 
-  const filteredItems = list?.items?.filter((item: WishlistItem) => {
-    if (filter === 'active') return !item.is_purchased;
-    if (filter === 'purchased') return item.is_purchased;
-    return true;
-  });
+  if (!list) {
+    return null;
+  }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <button onClick={() => navigate('/dashboard')} className="flex items-center text-gray-500 hover:text-brand-primary mb-6 transition-all group font-bold">
-        <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" /> 
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="mb-6 flex items-center font-bold text-gray-500 transition-colors hover:text-brand-primary"
+      >
+        <ArrowLeft size={20} className="mr-2" />
         Назад к спискам
       </button>
 
-      <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-gray-100 mb-8 flex flex-col sm:flex-row justify-between items-start gap-6">
+      <section className="mb-8 flex flex-col gap-6 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm sm:flex-row sm:items-start sm:justify-between">
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="mb-2 flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold text-gray-900">{list.title}</h1>
-            <span className="px-2.5 py-1 bg-indigo-50 text-brand-primary text-[10px] font-bold rounded-lg uppercase tracking-wider">
+            <span
+              className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                list.is_public ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
               {list.is_public ? 'Публичный' : 'Приватный'}
             </span>
           </div>
-          <p className="text-gray-500 text-lg">{list.description || 'Описание не добавлено'}</p>
+          <p className="text-lg text-gray-500">{list.description || 'Описание не добавлено'}</p>
+          <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+            <span>Всего товаров: {list.items_count}</span>
+            <span>Забронировано: {list.reserved_count || 0}</span>
+            <span>Куплено: {list.purchased_count || 0}</span>
+          </div>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Button variant="secondary" className="flex-1 sm:w-12 sm:h-12 p-0 rounded-2xl" onClick={openEditList}>
-            <Edit2 size={20} />
-          </Button>
-          <Button variant="danger" className="flex-1 sm:w-12 sm:h-12 p-0 rounded-2xl" onClick={() => setIsDelListOpen(true)}>
-            <Trash2 size={20} />
-          </Button>
-        </div>
-      </div>
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
-        <div>
-           <h2 className="text-xl font-bold text-gray-900">Товары ({list.items?.length || 0})</h2>
-           <div className="flex bg-gray-100 p-1 rounded-xl mt-3 w-fit">
-              <button onClick={() => setFilter('all')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === 'all' ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Все</button>
-              <button onClick={() => setFilter('active')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === 'active' ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Нужно купить</button>
-              <button onClick={() => setFilter('purchased')} className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === 'purchased' ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Куплено</button>
-           </div>
+        <div className="flex w-full flex-col gap-2 sm:w-auto">
+          {list.is_public ? (
+            <Button
+              variant="secondary"
+              className="sm:min-w-[180px]"
+              onClick={() => void handleShare()}
+              isLoading={sharing}
+              loadingLabel="Подготовка..."
+            >
+              <Link2 size={18} />
+              Поделиться
+            </Button>
+          ) : null}
+          <div className="flex gap-2">
+            <Button variant="secondary" className="sm:w-12 sm:px-0" onClick={() => setIsEditListOpen(true)}>
+              <Edit2 size={18} />
+            </Button>
+            <Button variant="danger" className="sm:w-12 sm:px-0" onClick={() => setIsDeleteListOpen(true)}>
+              <Trash2 size={18} />
+            </Button>
+          </div>
         </div>
-        <Button onClick={openItemModal} className="w-full sm:w-auto py-2.5 px-6 flex gap-2 h-11 shadow-md">
-          <Plus size={18} /> Добавить подарок
-        </Button>
-      </div>
+      </section>
 
-      <div className="space-y-4">
-        {(!filteredItems || filteredItems.length === 0) ? (
-          <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-gray-100 text-gray-400">
-            <Gift className="mx-auto mb-3 opacity-10" size={48} />
+      <section className="mb-8 flex flex-col gap-5 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Товары</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Режим «Сюрприз» скрывает забронированные подарки, пока вы не включите показ.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="flex flex-wrap gap-2">
+              {([
+                ['all', 'Все'],
+                ['free', 'Свободные'],
+                ['reserved', 'Забронированные'],
+                ['purchased', 'Купленные'],
+              ] as [ItemFilter, string][]).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilter(value)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                    filter === value
+                      ? 'bg-brand-primary text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <label className="flex items-center gap-3 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700">
+              <input
+                type="checkbox"
+                checked={showReserved}
+                onChange={(event) => setShowReserved(event.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+              />
+              Показать забронированные
+            </label>
+
+            <Button className="sm:w-auto" onClick={openCreateItem}>
+              <Plus size={18} />
+              Добавить подарок
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        {filteredItems.length === 0 ? (
+          <div className="rounded-3xl border-2 border-dashed border-gray-100 bg-white py-20 text-center text-gray-400">
+            <Gift className="mx-auto mb-3 opacity-20" size={48} />
             <p className="font-bold">Ничего не найдено</p>
           </div>
         ) : (
-          filteredItems.map((item: WishlistItem) => (
-            <div key={item.id} className={`bg-white p-5 rounded-3xl border transition-all flex items-center gap-5 group ${item.is_purchased ? 'border-gray-50 opacity-60' : 'border-gray-100 hover:border-brand-primary shadow-sm'}`}>
-              <div onClick={() => togglePurchased(item)} className="text-brand-primary cursor-pointer hover:scale-110 transition-transform active:scale-95">
-                {item.is_purchased ? <CheckCircle2 size={30} className="text-green-500" /> : <Circle size={30} className="text-gray-200" />}
-              </div>
-
-              {/* КАРТИНКА ТОВАРА: С проверкой наличия */}
-              <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center text-brand-primary flex-shrink-0 overflow-hidden border border-gray-100 relative">
-                {item.image_url ? (
-                  <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
+          filteredItems.map((item) => (
+            <article
+              key={item.id}
+              className={`flex flex-col gap-4 rounded-3xl border bg-white p-5 transition-all sm:flex-row sm:items-center ${
+                item.is_purchased ? 'border-gray-100 bg-gray-50/70' : 'border-gray-100 hover:shadow-md'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => void handleTogglePurchased(item)}
+                className="shrink-0 text-brand-primary transition-transform hover:scale-110 active:scale-95"
+                aria-label={item.is_purchased ? 'Снять отметку о покупке' : 'Отметить как купленный'}
+              >
+                {item.is_purchased ? (
+                  <CheckCircle2 size={30} className="text-green-500" />
                 ) : (
-                  <div className="flex flex-col items-center gap-1 opacity-20">
-                    <ImageIcon size={28} />
-                    <span className="text-[8px] font-bold uppercase tracking-tighter">Нет фото</span>
+                  <Circle size={30} className="text-gray-300" />
+                )}
+              </button>
+
+              <div className="flex h-24 w-full shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-gray-100 bg-gray-50 sm:w-24">
+                {item.image_url ? (
+                  <img src={item.image_url} alt={item.title} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-gray-300">
+                    <ImageIcon size={26} />
+                    <span className="text-[10px] font-semibold uppercase">Нет фото</span>
                   </div>
                 )}
               </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className={`font-bold truncate text-lg ${item.is_purchased ? 'line-through text-gray-400' : 'text-gray-900'}`}>{item.title}</h4>
-                  <div className="flex items-center text-amber-400 bg-amber-50 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                    <Star size={10} className="fill-current mr-0.5" /> {item.priority}
-                  </div>
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 flex flex-wrap items-start gap-2">
+                  <h3
+                    className={`text-lg font-bold ${
+                      item.is_purchased ? 'text-gray-400 line-through' : 'text-gray-900'
+                    }`}
+                  >
+                    {item.title}
+                  </h3>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+                    <Star size={12} className="fill-current" />
+                    {item.priority}
+                  </span>
+                  {item.is_reserved ? (
+                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                      Занято: {item.reserved_by?.guest_name || 'Гость'}
+                    </span>
+                  ) : null}
+                  {item.is_purchased ? (
+                    <span className="rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold text-white">
+                      Куплено
+                    </span>
+                  ) : null}
                 </div>
-                <div className="flex items-center gap-4 text-sm font-bold">
-                  <span className="text-brand-primary">{Number(item.price).toLocaleString()} {item.currency}</span>
-                  {item.url && <a href={item.url} target="_blank" rel="noreferrer" className="text-gray-400 hover:text-brand-primary transition-colors"><ExternalLink size={16} /></a>}
+
+                <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
+                  <span className="text-brand-primary">
+                    {Number(item.price).toLocaleString('ru-RU')} {item.currency}
+                  </span>
+                  {item.url ? (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-gray-400 transition-colors hover:text-brand-primary"
+                    >
+                      Открыть
+                      <ExternalLink size={14} />
+                    </a>
+                  ) : null}
                 </div>
-                {item.note && <p className="text-gray-400 text-xs mt-2 flex items-center gap-1.5 line-clamp-1"><MessageSquare size={12} /> {item.note}</p>}
+
+                {item.note ? (
+                  <p className="mt-3 flex items-center gap-1.5 text-sm text-gray-500">
+                    <MessageSquare size={14} />
+                    {item.note}
+                  </p>
+                ) : null}
               </div>
 
-              <div className="flex gap-1 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => {
-                   setEditingItem(item);
-                   setItemForm({title: item.title, url: item.url || '', price: item.price.toString(), currency: item.currency, image_url: item.image_url || '', priority: item.priority, note: item.note || ''});
-                   setUserModifiedFields(new Set());
-                   resetSession();
-                   setIsItemModalOpen(true);
-                }} className="p-2.5 text-gray-400 hover:text-brand-primary hover:bg-indigo-50 rounded-xl transition-all"><Edit2 size={18} /></button>
+              <div className="flex shrink-0 gap-2">
                 <button
+                  type="button"
+                  onClick={() => openEditItem(item)}
+                  className="rounded-2xl bg-gray-50 p-3 text-gray-400 transition-colors hover:bg-indigo-50 hover:text-brand-primary"
+                  aria-label="Редактировать подарок"
+                >
+                  <Edit2 size={18} />
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setItemToDelete(item);
-                    setIsDelItemOpen(true);
+                    setIsDeleteItemOpen(true);
                   }}
-                  className="p-2.5 text-gray-400 hover:text-brand-error hover:bg-red-50 rounded-xl transition-all"
+                  className="rounded-2xl bg-gray-50 p-3 text-gray-400 transition-colors hover:bg-red-50 hover:text-brand-error"
+                  aria-label="Удалить подарок"
                 >
                   <Trash2 size={18} />
                 </button>
               </div>
-            </div>
+            </article>
           ))
         )}
-      </div>
+      </section>
 
-      {/* МОДАЛКИ */}
       <Modal isOpen={isEditListOpen} onClose={() => setIsEditListOpen(false)} title="Настройки списка">
         <div className="space-y-5">
-          <Input label="Название *" value={listForm.title} maxLength={100} onChange={e => setListForm({...listForm, title: e.target.value})} />
-          <Textarea label="Описание" className="h-32" value={listForm.description} maxLength={500} onChange={e => setListForm({...listForm, description: e.target.value})} />
-          <div className="flex items-center gap-3 p-4 bg-indigo-50/50 rounded-2xl cursor-pointer" onClick={() => setListForm({...listForm, is_public: !listForm.is_public})}>
-            <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer" checked={listForm.is_public} readOnly />
+          <Input
+            label="Название"
+            value={listForm.title}
+            maxLength={100}
+            onChange={(event) => setListForm((current) => ({ ...current, title: event.target.value }))}
+          />
+          <Textarea
+            label="Описание"
+            className="h-32"
+            value={listForm.description}
+            maxLength={500}
+            onChange={(event) =>
+              setListForm((current) => ({ ...current, description: event.target.value }))
+            }
+          />
+          <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-indigo-50/60 p-4">
+            <input
+              type="checkbox"
+              className="h-5 w-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+              checked={listForm.is_public}
+              onChange={(event) =>
+                setListForm((current) => ({ ...current, is_public: event.target.checked }))
+              }
+            />
             <span className="text-sm font-bold text-gray-900">Публичный список</span>
-          </div>
-          <Button onClick={handleUpdateList} disabled={!listForm.title.trim()}>Сохранить</Button>
+          </label>
+          <Button
+            onClick={() => void handleUpdateList()}
+            disabled={!listForm.title.trim()}
+            isLoading={saving}
+            loadingLabel="Сохранение..."
+          >
+            Сохранить
+          </Button>
         </div>
       </Modal>
 
-      <Modal isOpen={isItemModalOpen} onClose={closeItemModal} title={editingItem ? "Изменить товар" : "Новый подарок"}>
+      <Modal
+        isOpen={isItemModalOpen}
+        onClose={closeItemModal}
+        title={editingItem ? 'Изменить подарок' : 'Новый подарок'}
+      >
         <div className="space-y-4">
-          {/* Название */}
           {isParsing && userModifiedFields.size === 0 ? (
             <div className="space-y-1.5">
-              <label className="block text-sm font-bold text-gray-700 ml-1">Название *</label>
+              <label className="ml-1 block text-sm font-bold text-gray-700">Название</label>
               <InputSkeleton height="md" />
             </div>
           ) : (
             <Input
-              label="Название *"
+              label="Название"
               placeholder="Что подарить?"
               value={itemForm.title}
               maxLength={255}
-              onChange={handleTitleChange}
+              onChange={(event) => {
+                setItemForm((current) => ({ ...current, title: event.target.value }));
+                setUserModifiedFields((current) => new Set([...current, 'title']));
+              }}
             />
           )}
-          
-          {/* URL с логикой парсинга */}
+
           <div className="space-y-1.5">
-            <label className="block text-sm font-bold text-gray-700 ml-1">Ссылка на товар *</label>
+            <label className="ml-1 block text-sm font-bold text-gray-700">Ссылка на товар</label>
             <div className="relative">
-              <input 
+              <input
                 type="text"
                 placeholder="https://..."
                 value={itemForm.url}
-                onChange={handleUrlChange}
-                onPaste={handleUrlPasteEvent}
-                onBlur={handleUrlBlurEvent}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setItemForm((current) => ({ ...current, url: value }));
+                  handleUrlInputChange(value);
+                }}
+                onPaste={(event) => {
+                  const pastedUrl = event.clipboardData.getData('text');
+                  if (pastedUrl.trim()) handleUrlPaste(pastedUrl);
+                }}
+                onBlur={() => handleUrlBlur(itemForm.url)}
                 disabled={isParsing}
-                className={`w-full px-4 py-3 rounded-2xl border outline-none transition-all
-                  ${isParsing ? 'bg-gray-50 text-gray-400 border-gray-100' : 'bg-white border-gray-200 focus:ring-4 focus:ring-indigo-50'}
-                  ${parsingError ? 'border-red-200 focus:ring-red-100' : ''}
-                `}
+                className={`w-full rounded-2xl border px-4 py-3 outline-none transition-all ${
+                  parsingError
+                    ? 'border-red-200 bg-red-50/30 focus:ring-4 focus:ring-red-100'
+                    : 'border-gray-200 bg-white focus:border-brand-primary focus:ring-4 focus:ring-indigo-50'
+                } ${isParsing ? 'bg-gray-50 text-gray-400' : ''}`}
               />
-              {isParsing && (
+              {isParsing ? (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   <Spinner size="sm" />
                 </div>
-              )}
+              ) : null}
             </div>
-            {parsingError && (
-              <p className="text-xs text-red-500 ml-1">{parsingError}</p>
-            )}
+            {parsingError ? <p className="ml-1 text-xs text-red-500">{parsingError}</p> : null}
           </div>
-          
-          {/* Фото с loading skeleton */}
+
           {isParsing && userModifiedFields.size === 0 ? (
             <div className="space-y-1.5">
-              <label className="block text-sm font-bold text-gray-700 ml-1">Ссылка на фото (опционально)</label>
+              <label className="ml-1 block text-sm font-bold text-gray-700">Ссылка на фото</label>
               <InputSkeleton height="md" />
             </div>
           ) : (
-            <Input 
-              label="Ссылка на фото (опционально)" 
-              placeholder="https://... (прямая ссылка на фото)" 
-              value={itemForm.image_url} 
-              error={itemForm.image_url && !isValidUrl(itemForm.image_url) ? 'Неверный формат ссылки' : ''}
-              onChange={handleImageUrlChange} 
+            <Input
+              label="Ссылка на фото"
+              placeholder="https://... (необязательно)"
+              value={itemForm.image_url}
+              error={
+                itemForm.image_url && !isValidHttpUrl(itemForm.image_url) ? 'Неверный формат ссылки' : ''
+              }
+              onChange={(event) => {
+                setItemForm((current) => ({ ...current, image_url: event.target.value }));
+                setUserModifiedFields((current) => new Set([...current, 'image_url']));
+              }}
             />
           )}
-          
-          {/* Цена и валюта */}
+
           <div className="grid grid-cols-2 gap-4">
             {isParsing && userModifiedFields.size === 0 ? (
               <div className="space-y-1.5">
-                <label className="block text-sm font-bold text-gray-700 ml-1">Цена *</label>
+                <label className="ml-1 block text-sm font-bold text-gray-700">Цена</label>
                 <InputSkeleton height="md" />
               </div>
             ) : (
               <Input
-                label="Цена *"
-                type="number"
+                label="Цена"
+                type="text"
                 placeholder="0.00"
                 value={itemForm.price}
-                onKeyDown={handlePriceKeyDown}
-                onChange={handlePriceChange}
+                onChange={(event) => handlePriceChange(event.target.value)}
               />
             )}
+
             <div className="space-y-1.5">
-              <label className="block text-sm font-bold text-gray-700 ml-1">Валюта</label>
-              <select 
-                className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-indigo-50 bg-white cursor-pointer"
+              <label className="ml-1 block text-sm font-bold text-gray-700">Валюта</label>
+              <select
+                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-4 focus:ring-indigo-50"
                 value={itemForm.currency}
-                onChange={e => setItemForm({...itemForm, currency: e.target.value})}
+                onChange={(event) =>
+                  setItemForm((current) => ({
+                    ...current,
+                    currency: event.target.value as 'BYN' | 'USD' | 'EUR',
+                  }))
+                }
               >
                 <option value="BYN">BYN</option>
                 <option value="USD">USD</option>
@@ -481,104 +720,81 @@ const WishlistDetail = () => {
               </select>
             </div>
           </div>
-          
-          {/* Приоритет */}
+
           <div className="space-y-1.5">
-            <label className="block text-sm font-bold text-gray-700 ml-1">Приоритет</label>
-            <select 
-              className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-indigo-50 bg-white cursor-pointer" 
-              value={itemForm.priority} 
-              onChange={e => setItemForm({...itemForm, priority: Number(e.target.value)})}
+            <label className="ml-1 block text-sm font-bold text-gray-700">Приоритет</label>
+            <select
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-4 focus:ring-indigo-50"
+              value={itemForm.priority}
+              onChange={(event) =>
+                setItemForm((current) => ({ ...current, priority: Number(event.target.value) }))
+              }
             >
-              <option value="1">1 — Низкий</option>
-              <option value="2">2 — Ниже среднего</option>
-              <option value="3">3 — Средний</option>
-              <option value="4">4 — Высокий</option>
-              <option value="5">5 — Максимальный</option>
+              <option value="1">1 — низкий</option>
+              <option value="2">2 — ниже среднего</option>
+              <option value="3">3 — средний</option>
+              <option value="4">4 — высокий</option>
+              <option value="5">5 — максимальный</option>
             </select>
           </div>
-          
-          {/* Комментарий */}
-          <Textarea 
-            label="Комментарий (опционально)" 
-            placeholder="Цвет, размер и т.д." 
-            className="h-24" 
-            maxLength={500} 
-            value={itemForm.note} 
-            onChange={e => setItemForm({...itemForm, note: e.target.value})} 
+
+          <Textarea
+            label="Комментарий"
+            placeholder="Цвет, размер и т.д."
+            className="h-24"
+            maxLength={500}
+            value={itemForm.note}
+            onChange={(event) => setItemForm((current) => ({ ...current, note: event.target.value }))}
           />
-          
-          {/* Кнопка сохранения с loading состоянием */}
+
           <Button
-            onClick={handleSaveItem}
-            disabled={!isItemFormValid || saving || isParsing}
+            onClick={() => void handleSaveItem()}
+            disabled={!itemFormValid || saving || isParsing}
             isLoading={saving}
+            loadingLabel="Сохранение..."
           >
-            {editingItem ? "Сохранить" : "Добавить"}
+            {editingItem ? 'Сохранить' : 'Добавить'}
           </Button>
         </div>
       </Modal>
 
-      <Modal isOpen={isDelListOpen} onClose={() => setIsDelListOpen(false)} title="Удалить список?">
-        <div className="text-center px-2">
-          <p className="text-gray-500 mb-8 text-sm">Это действие нельзя отменить. Все подарки в этом списке будут удалены навсегда.</p>
-          <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => setIsDelListOpen(false)}>Отмена</Button>
-            <Button variant="danger" className="flex-1" onClick={handleDeleteList}>Да, удалить</Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isDelItemOpen}
-        onClose={() => {
-          setIsDelItemOpen(false);
-          setItemToDelete(null);
-        }}
-        title="Удалить подарок?"
-      >
-        <div className="text-center px-2">
-          <p className="text-gray-500 mb-8 text-sm">
-            Это действие нельзя отменить. Подарок будет удалён из списка навсегда.
+      <Modal isOpen={isDeleteListOpen} onClose={() => setIsDeleteListOpen(false)} title="Удалить список?">
+        <div className="text-center">
+          <p className="mb-8 text-sm text-gray-500">
+            Это действие нельзя отменить. Все подарки и связанные бронирования будут удалены.
           </p>
           <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              className="flex-1"
-              onClick={() => {
-                setIsDelItemOpen(false);
-                setItemToDelete(null);
-              }}
-            >
+            <Button variant="secondary" className="flex-1" onClick={() => setIsDeleteListOpen(false)}>
               Отмена
             </Button>
-            <Button
-              variant="danger"
-              className="flex-1"
-              onClick={async () => {
-                if (!itemToDelete) return;
-                await handleDeleteItem(itemToDelete.id);
-                setIsDelItemOpen(false);
-                setItemToDelete(null);
-              }}
-            >
+            <Button variant="danger" className="flex-1" onClick={() => void handleDeleteList()}>
               Да, удалить
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* Toast для уведомления об ошибке парсинга */}
-      {toastMessage && <Toast message={toastMessage} type="error" onClose={() => setToastMessage(null)} />}
+      <Modal isOpen={isDeleteItemOpen} onClose={() => setIsDeleteItemOpen(false)} title="Удалить подарок?">
+        <div className="text-center">
+          <p className="mb-8 text-sm text-gray-500">
+            Это действие нельзя отменить. Подарок будет удалён из списка навсегда.
+          </p>
+          <div className="flex gap-3">
+            <Button variant="secondary" className="flex-1" onClick={() => setIsDeleteItemOpen(false)}>
+              Отмена
+            </Button>
+            <Button variant="danger" className="flex-1" onClick={() => void handleDeleteItem()}>
+              Да, удалить
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
-      {/* Модальное окно ошибки */}
-      <ErrorModal 
-        isOpen={errorMessage !== null} 
-        message={errorMessage || ''} 
-        onClose={() => setErrorMessage(null)} 
+      <ErrorModal
+        isOpen={errorMessage !== null}
+        message={errorMessage || ''}
+        onClose={() => setErrorMessage(null)}
       />
     </div>
   );
-};
-
-export default WishlistDetail;
+}
