@@ -196,7 +196,7 @@ export default function Dashboard() {
             const itemsCount = list.items_count || 0;
             const reservedCount = list.reserved_count || 0;
             const purchasedCount = list.purchased_count || 0;
-            const progressValue = itemsCount > 0 ? Math.min(((reservedCount + purchasedCount) / itemsCount) * 100, 100) : 0;
+            const progressValue = itemsCount > 0 ? Math.min((reservedCount / itemsCount) * 100, 100) : 0;
 
             return (
               <article
@@ -236,7 +236,7 @@ export default function Dashboard() {
                   <div className="mb-3 flex items-center justify-between text-sm font-semibold text-gray-700">
                     <span>Прогресс списка</span>
                     <span>
-                      {reservedCount + purchasedCount}/{itemsCount || 0}
+                      {reservedCount}/{itemsCount || 0}
                     </span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-white">
@@ -251,9 +251,9 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="mt-auto flex items-center gap-2">
-                  <Link to={`/wishlist/${list.id}`} className="min-h-[44px] min-w-[44px] flex-1">
-                    <Button variant="primary" className="h-11 min-h-[44px] text-sm">
+                <div className="mt-auto grid grid-cols-[minmax(0,1fr)_44px_44px_44px] items-center gap-2">
+                  <Link to={`/wishlist/${list.id}`} className="block min-h-[44px] min-w-0">
+                    <Button variant="primary" className="h-11 min-h-[44px] !w-full text-sm">
                       Открыть
                     </Button>
                   </Link>
@@ -262,7 +262,7 @@ export default function Dashboard() {
                     <Button
                       type="button"
                       variant="secondary"
-                      className="h-11 w-11 min-h-[44px] min-w-[44px] rounded-2xl px-0"
+                      className="h-11 !w-11 min-h-[44px] !min-w-[44px] rounded-2xl !px-0"
                       onClick={() => void handleShare(list)}
                       isLoading={sharingId === list.id}
                       loadingLabel=""

@@ -102,7 +102,7 @@ export default function SharedView() {
         ) : (
           <section className="mx-auto max-w-2xl rounded-[32px] border border-red-100 bg-white px-6 py-16 text-center shadow-sm">
             <Gift className="mx-auto mb-4 text-red-300" size={40} />
-            <h1 className="text-2xl font-black text-gray-900">Публичный список недоступен</h1>
+            <h1 className="text-2xl font-black text-gray-900">Список недоступен</h1>
             <p className="mt-3 text-gray-600">{error}</p>
           </section>
         )}

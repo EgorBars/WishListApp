@@ -22,6 +22,8 @@ const initialForm: ReservationPayload = {
   guest_name: '',
   guest_email: '',
 };
+const GUEST_NAME_MAX_LENGTH = 100;
+const GUEST_EMAIL_MAX_LENGTH = 255;
 
 export function ReservationModal({
   isOpen,
@@ -55,7 +57,9 @@ export function ReservationModal({
   const isValid = !localErrors.guest_name && !localErrors.guest_email;
 
   const handleFieldChange = (field: keyof ReservationPayload, value: string) => {
-    setForm((current) => ({ ...current, [field]: value }));
+    const maxLength = field === 'guest_name' ? GUEST_NAME_MAX_LENGTH : GUEST_EMAIL_MAX_LENGTH;
+    const normalizedValue = value.slice(0, maxLength);
+    setForm((current) => ({ ...current, [field]: normalizedValue }));
     setTouched((current) => ({ ...current, [field]: true }));
     resetErrors();
   };
@@ -108,6 +112,7 @@ export function ReservationModal({
           placeholder="Иван Петров"
           autoComplete="name"
           disabled={isSubmitting}
+          maxLength={GUEST_NAME_MAX_LENGTH}
           value={form.guest_name}
           error={guestNameError ?? ''}
           onChange={(event) => handleFieldChange('guest_name', event.target.value)}
@@ -120,6 +125,7 @@ export function ReservationModal({
           placeholder="ivan@example.com"
           autoComplete="email"
           disabled={isSubmitting}
+          maxLength={GUEST_EMAIL_MAX_LENGTH}
           value={form.guest_email}
           error={guestEmailError ?? ''}
           onChange={(event) => handleFieldChange('guest_email', event.target.value)}

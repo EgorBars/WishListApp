@@ -164,6 +164,15 @@ export default function WishlistDetail() {
     });
   }, [filter, list?.items]);
 
+  const listStats = useMemo(() => {
+    const items = list?.items ?? [];
+    return {
+      itemsCount: items.length,
+      reservedCount: items.filter((item) => Boolean(item.is_reserved)).length,
+      purchasedCount: items.filter((item) => item.is_purchased).length,
+    };
+  }, [list?.items]);
+
   const openCreateItem = () => {
     setEditingItem(null);
     setItemForm(initialItemForm);
@@ -291,10 +300,6 @@ export default function WishlistDetail() {
         current
           ? {
               ...current,
-              purchased_count: Math.max(
-                0,
-                (current.purchased_count || 0) + (updated.is_purchased ? 1 : -1),
-              ),
               items: current.items.map((currentItem) =>
                 currentItem.id === item.id ? { ...currentItem, ...updated } : currentItem,
               ),
@@ -313,13 +318,6 @@ export default function WishlistDetail() {
       current
         ? {
             ...current,
-            items_count: Math.max(0, current.items_count - 1),
-            reserved_count: itemToDelete.is_reserved
-              ? Math.max(0, (current.reserved_count || 0) - 1)
-              : current.reserved_count,
-            purchased_count: itemToDelete.is_purchased
-              ? Math.max(0, (current.purchased_count || 0) - 1)
-              : current.purchased_count,
             items: current.items.filter((item) => item.id !== itemToDelete.id),
           }
         : current,
@@ -368,9 +366,9 @@ export default function WishlistDetail() {
           </div>
           <p className="text-lg text-gray-500">{list.description || 'Описание не добавлено'}</p>
           <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-gray-500">
-            <span>Всего товаров: {list.items_count}</span>
-            <span>Забронировано: {list.reserved_count || 0}</span>
-            <span>Куплено: {list.purchased_count || 0}</span>
+            <span>Всего товаров: {listStats.itemsCount}</span>
+            <span>Забронировано: {listStats.reservedCount}</span>
+            <span>Куплено: {listStats.purchasedCount}</span>
           </div>
         </div>
 
@@ -501,7 +499,7 @@ export default function WishlistDetail() {
                   </span>
                   {item.is_reserved ? (
                     <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-                      Занято: {item.reserved_by?.guest_name || 'Гость'}
+                      Забронировано: {item.reserved_by?.guest_name || 'Гость'}
                     </span>
                   ) : null}
                   {item.is_purchased ? (
@@ -640,8 +638,17 @@ export default function WishlistDetail() {
                 onPaste={(event) => {
                   const pastedUrl = event.clipboardData.getData('text');
                   if (!pastedUrl.trim()) return;
-                  setItemForm((current) => ({ ...current, url: pastedUrl }));
-                  handleUrlPaste(pastedUrl);
+                  event.preventDefault();
+                  const input = event.currentTarget;
+                  const selectionStart = input.selectionStart ?? itemForm.url.length;
+                  const selectionEnd = input.selectionEnd ?? itemForm.url.length;
+                  const nextValue =
+                    itemForm.url.slice(0, selectionStart) +
+                    pastedUrl +
+                    itemForm.url.slice(selectionEnd);
+
+                  setItemForm((current) => ({ ...current, url: nextValue }));
+                  handleUrlPaste(nextValue);
                 }}
                 onBlur={() => handleUrlBlur(itemForm.url)}
                 className={`w-full rounded-2xl border px-4 py-3 outline-none transition-all ${
