@@ -2,7 +2,18 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +35,16 @@ class Wishlist(Base):
     title: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # НОВОЕ ПОЛЕ SPRINT 4: Публичный ID для шеринга
+    public_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        unique=True,
+        nullable=False,
+        default=uuid.uuid4,
+        index=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -36,9 +57,11 @@ class Wishlist(Base):
         nullable=True,
     )
 
+    # Связи
     items: Mapped[list["WishlistItem"]] = relationship(
         back_populates="wishlist", cascade="all, delete-orphan"
     )
+    user: Mapped["User"] = relationship(lazy="select")
 
 
 class Item(Base):
@@ -68,15 +91,19 @@ class Item(Base):
 class WishlistItem(Base):
     __tablename__ = "wishlist_items"
 
+    # ИЗМЕНЕНИЕ SPRINT 4: Добавляем суррогатный ID для связи с Reservation
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     wishlist_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("wishlists.id", ondelete="CASCADE"),
-        primary_key=True,
+        nullable=False,
     )
     item_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("items.id", ondelete="CASCADE"),
-        primary_key=True,
+        nullable=False,
     )
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -87,8 +114,16 @@ class WishlistItem(Base):
         nullable=False,
     )
 
+    # Связи
     wishlist: Mapped["Wishlist"] = relationship(back_populates="items")
     item: Mapped["Item"] = relationship(back_populates="wishlists")
+
+    # НОВОЕ В SPRINT 4: Связь 1-к-1 с бронированием
+    reservation: Mapped["Reservation | None"] = relationship(
+        back_populates="wishlist_item",
+        cascade="all, delete-orphan",
+        uselist=False
+    )
 
     __table_args__ = (
         UniqueConstraint(
@@ -103,3 +138,29 @@ class WishlistItem(Base):
         Index("ix_wishlist_items_wishlist_id", "wishlist_id"),
         Index("ix_wishlist_items_item_id", "item_id"),
     )
+
+
+class Reservation(Base):
+    __tablename__ = "reservations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    # UNIQUE обеспечивает, что один товар в списке забронирован только один раз
+    wishlist_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("wishlist_items.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+    guest_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    guest_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    reserved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    # Связь обратно к товару в списке
+    wishlist_item: Mapped["WishlistItem"] = relationship(back_populates="reservation")

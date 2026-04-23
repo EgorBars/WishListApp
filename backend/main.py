@@ -1,13 +1,12 @@
 import logging
-
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import get_settings
-from routers import auth, users, wishlists, items
+# ДОБАВЛЕН РОУТЕР PUBLIC
+from routers import auth, users, wishlists, items, public
 
 logger = logging.getLogger("wishlist_app")
-
 settings = get_settings()
 
 app = FastAPI(title=settings.app_name)
@@ -29,5 +28,7 @@ api_v1.include_router(auth.router)
 api_v1.include_router(users.router)
 api_v1.include_router(wishlists.router)
 api_v1.include_router(items.router)
+# ПОДКЛЮЧАЕМ НОВЫЙ РОУТЕР
+api_v1.include_router(public.router)
 
 app.include_router(api_v1)
