@@ -57,7 +57,7 @@ async def get_public_wishlist(
             joinedload(WishlistItem.reservation)
         )
         .where(WishlistItem.wishlist_id == wl.id)
-        .order_at(WishlistItem.added_at.desc())
+        .order_by(WishlistItem.added_at.desc())
     )
     items_res = await db.execute(items_stmt)
     wishlist_items = items_res.scalars().all()

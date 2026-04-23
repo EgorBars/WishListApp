@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -55,6 +56,14 @@ function getItemErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function isRequestCanceled(error: unknown) {
+  return (
+    axios.isCancel(error) ||
+    (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') ||
+    (error instanceof DOMException && error.name === 'AbortError')
+  );
+}
+
 export default function WishlistDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -91,6 +100,9 @@ export default function WishlistDetail() {
     resetSession,
   } = useItemParsing({
     onSuccess: (data) => {
+      if (data.url) {
+        setItemForm((current) => ({ ...current, url: data.url }));
+      }
       if (!userModifiedFields.has('title') && data.title) {
         setItemForm((current) => ({ ...current, title: data.title ?? '' }));
       }
@@ -109,12 +121,11 @@ export default function WishlistDetail() {
     },
   });
 
-  const loadWishlist = useCallback(async (showAll: boolean) => {
-    const controller = new AbortController();
+  const loadWishlist = useCallback(async (showAll: boolean, signal?: AbortSignal) => {
     setLoading(true);
 
     try {
-      const data = await fetchWishlist(id, { show_all: showAll, signal: controller.signal });
+      const data = await fetchWishlist(id, { show_all: showAll, signal });
       setList(data);
       setListForm({
         title: data.title,
@@ -122,37 +133,18 @@ export default function WishlistDetail() {
         is_public: data.is_public,
       });
     } catch (error) {
+      if (isRequestCanceled(error)) return;
       setErrorMessage(getItemErrorMessage(error, 'Не удалось загрузить список'));
     } finally {
       setLoading(false);
     }
-
-    return () => controller.abort();
   }, [id]);
 
   useEffect(() => {
     const controller = new AbortController();
-
-    async function run() {
-      setLoading(true);
-      try {
-        const data = await fetchWishlist(id, { show_all: showReserved, signal: controller.signal });
-        setList(data);
-        setListForm({
-          title: data.title,
-          description: data.description ?? '',
-          is_public: data.is_public,
-        });
-      } catch (error) {
-        setErrorMessage(getItemErrorMessage(error, 'Не удалось загрузить список'));
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void run();
+    void loadWishlist(showReserved, controller.signal);
     return () => controller.abort();
-  }, [id, showReserved]);
+  }, [showReserved, loadWishlist]);
 
   const itemFormValid = useMemo(() => {
     const titleOk = itemForm.title.trim().length > 0;
@@ -647,10 +639,11 @@ export default function WishlistDetail() {
                 }}
                 onPaste={(event) => {
                   const pastedUrl = event.clipboardData.getData('text');
-                  if (pastedUrl.trim()) handleUrlPaste(pastedUrl);
+                  if (!pastedUrl.trim()) return;
+                  setItemForm((current) => ({ ...current, url: pastedUrl }));
+                  handleUrlPaste(pastedUrl);
                 }}
                 onBlur={() => handleUrlBlur(itemForm.url)}
-                disabled={isParsing}
                 className={`w-full rounded-2xl border px-4 py-3 outline-none transition-all ${
                   parsingError
                     ? 'border-red-200 bg-red-50/30 focus:ring-4 focus:ring-red-100'

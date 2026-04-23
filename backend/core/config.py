@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     reset_token_expire_hours: int = Field(default=1, alias="RESET_TOKEN_EXPIRE_HOURS")
 
-    frontend_url: str = Field(default="http://localhost:3000", alias="FRONTEND_URL")
+    frontend_url: str = Field(default="http://localhost:5173", alias="FRONTEND_URL")
 
     smtp_host: str = Field(default="localhost", alias="SMTP_HOST")
     smtp_port: int = Field(default=587, alias="SMTP_PORT")

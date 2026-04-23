@@ -33,7 +33,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://wishlist_user:wishlist_password@db:5432/wishlist_db}
       DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql+psycopg://wishlist_user:wishlist_password@db:5432/wishlist_db}
       SECRET_KEY: ${SECRET_KEY:-00000000000000000000000000000000}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
     ports:
       - "8000:8000"
     restart: always

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Calendar, Edit2, Gift, Link2, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { Modal } from '../components/common/Modal';
@@ -31,6 +32,14 @@ function pluralizeItems(count: number) {
   return 'подарков';
 }
 
+function isRequestCanceled(error: unknown) {
+  return (
+    axios.isCancel(error) ||
+    (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') ||
+    (error instanceof DOMException && error.name === 'AbortError')
+  );
+}
+
 export default function Dashboard() {
   const { showToast } = useToast();
   const [wishlists, setWishlists] = useState<WishlistSummary[]>([]);
@@ -48,40 +57,25 @@ export default function Dashboard() {
     is_public: false,
   });
 
-  const fetchData = useCallback(async () => {
-    const controller = new AbortController();
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     setLoadError('');
 
     try {
-      const data = await fetchWishlists(controller.signal);
+      const data = await fetchWishlists(signal);
       setWishlists(data);
-    } catch {
+    } catch (error) {
+      if (isRequestCanceled(error)) return;
       setLoadError('Не удалось загрузить списки. Попробуйте обновить страницу.');
     } finally {
       setLoading(false);
     }
-
-    return () => controller.abort();
   }, []);
 
   useEffect(() => {
     const controller = new AbortController();
-
-    async function load() {
-      setLoadError('');
-      try {
-        const data = await fetchWishlists(controller.signal);
-        setWishlists(data);
-      } catch {
-        setLoadError('Не удалось загрузить списки. Попробуйте обновить страницу.');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void load();
+    void fetchData(controller.signal);
     return () => controller.abort();
-  }, []);
+  }, [fetchData]);
 
   const openCreate = () => {
     setEditingList(null);
