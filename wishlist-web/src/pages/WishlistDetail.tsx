@@ -390,31 +390,38 @@ export default function WishlistDetail() {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <div className="flex flex-wrap gap-2">
-              {([
-                ['all', 'Все'],
-                ['free', 'Свободные'],
-                ...(showReserved
-                  ? ([
-                      ['reserved', 'Забронированные'],
-                      ['purchased', 'Купленные'],
-                    ] as [ItemFilter, string][])
-                  : []),
-              ] as [ItemFilter, string][]).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFilter(value)}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                    filter === value
-                      ? 'bg-brand-primary text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-2">
+  {[
+    ['all', 'Все'],
+    ['free', 'Свободные'],
+    ['reserved', 'Забронированные'],
+    ['purchased', 'Купленные'],
+  ].map(([value, label]) => {
+    // Определяем, должна ли кнопка быть заблокирована
+    const isStatusFilter = value === 'reserved' || value === 'purchased';
+    const isDisabled = isStatusFilter && !showReserved;
+
+    return (
+      <button
+        key={value}
+        type="button"
+        disabled={isDisabled}
+        onClick={() => setFilter(value as ItemFilter)}
+        className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+          filter === value
+            ? 'bg-brand-primary text-white shadow-md'
+            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+        } ${
+          isDisabled 
+            ? 'opacity-40 cursor-not-allowed grayscale' 
+            : 'active:scale-95'
+        }`}
+      >
+        {label}
+      </button>
+    );
+  })}
+</div>
 
             <label className="flex items-center gap-3 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700">
               <input
