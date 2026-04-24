@@ -3,8 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import {
   ArrowLeft,
-  CheckCircle2,
-  Circle,
   Edit2,
   ExternalLink,
   Gift,
@@ -121,11 +119,11 @@ export default function WishlistDetail() {
     },
   });
 
-  const loadWishlist = useCallback(async (showAll: boolean, signal?: AbortSignal) => {
+  const loadWishlist = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
 
     try {
-      const data = await fetchWishlist(id, { show_all: showAll, signal });
+      const data = await fetchWishlist(id, { signal });
       setList(data);
       setListForm({
         title: data.title,
@@ -142,9 +140,15 @@ export default function WishlistDetail() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void loadWishlist(showReserved, controller.signal);
+    void loadWishlist(controller.signal);
     return () => controller.abort();
-  }, [showReserved, loadWishlist]);
+  }, [loadWishlist]);
+
+  useEffect(() => {
+    if (!showReserved && (filter === 'reserved' || filter === 'purchased')) {
+      setFilter('all');
+    }
+  }, [filter, showReserved]);
 
   const itemFormValid = useMemo(() => {
     const titleOk = itemForm.title.trim().length > 0;
@@ -282,7 +286,7 @@ export default function WishlistDetail() {
       }
 
       closeItemModal();
-      await loadWishlist(showReserved);
+      await loadWishlist();
     } catch (error) {
       setErrorMessage(getItemErrorMessage(error, 'Ошибка при сохранении товара'));
     } finally {
@@ -290,26 +294,6 @@ export default function WishlistDetail() {
     }
   };
 
-  const handleTogglePurchased = async (item: WishlistItem) => {
-    if (!list) return;
-    try {
-      const updated = await updateWishlistItem(list.id, item.id, {
-        is_purchased: !item.is_purchased,
-      });
-      setList((current) =>
-        current
-          ? {
-              ...current,
-              items: current.items.map((currentItem) =>
-                currentItem.id === item.id ? { ...currentItem, ...updated } : currentItem,
-              ),
-            }
-          : current,
-      );
-    } catch (error) {
-      setErrorMessage(getItemErrorMessage(error, 'Не удалось обновить статус товара'));
-    }
-  };
 
   const handleDeleteItem = async () => {
     if (!list || !itemToDelete) return;
@@ -410,8 +394,12 @@ export default function WishlistDetail() {
               {([
                 ['all', 'Все'],
                 ['free', 'Свободные'],
-                ['reserved', 'Забронированные'],
-                ['purchased', 'Купленные'],
+                ...(showReserved
+                  ? ([
+                      ['reserved', 'Забронированные'],
+                      ['purchased', 'Купленные'],
+                    ] as [ItemFilter, string][])
+                  : []),
               ] as [ItemFilter, string][]).map(([value, label]) => (
                 <button
                   key={value}
@@ -435,7 +423,7 @@ export default function WishlistDetail() {
                 onChange={(event) => setShowReserved(event.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
               />
-              Показать забронированные
+              Показать статус бронирования и покупки
             </label>
 
             <Button className="sm:w-auto" onClick={openCreateItem}>
@@ -460,18 +448,6 @@ export default function WishlistDetail() {
                 item.is_purchased ? 'border-gray-100 bg-gray-50/70' : 'border-gray-100 hover:shadow-md'
               }`}
             >
-              <button
-                type="button"
-                onClick={() => void handleTogglePurchased(item)}
-                className="shrink-0 text-brand-primary transition-transform hover:scale-110 active:scale-95"
-                aria-label={item.is_purchased ? 'Снять отметку о покупке' : 'Отметить как купленный'}
-              >
-                {item.is_purchased ? (
-                  <CheckCircle2 size={30} className="text-green-500" />
-                ) : (
-                  <Circle size={30} className="text-gray-300" />
-                )}
-              </button>
 
               <div className="flex h-24 w-full shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-gray-100 bg-gray-50 sm:w-24">
                 {item.image_url ? (
@@ -486,23 +462,19 @@ export default function WishlistDetail() {
 
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex flex-wrap items-start gap-2">
-                  <h3
-                    className={`text-lg font-bold ${
-                      item.is_purchased ? 'text-gray-400 line-through' : 'text-gray-900'
-                    }`}
-                  >
+                  <h3 className="text-lg font-bold text-gray-900">
                     {item.title}
                   </h3>
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
                     <Star size={12} className="fill-current" />
                     {item.priority}
                   </span>
-                  {item.is_reserved ? (
+                  {showReserved && item.is_reserved ? (
                     <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
                       Забронировано: {item.reserved_by?.guest_name || 'Гость'}
                     </span>
                   ) : null}
-                  {item.is_purchased ? (
+                  {showReserved && item.is_purchased ? (
                     <span className="rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold text-white">
                       Куплено
                     </span>
@@ -798,3 +770,4 @@ export default function WishlistDetail() {
     </div>
   );
 }
+

@@ -5,6 +5,8 @@ import type { WishlistItem } from '../../types';
 interface SharedGiftCardProps {
   item: WishlistItem;
   onReserve: (item: WishlistItem) => void;
+  onPurchase: (item: WishlistItem) => void;
+  isPurchasing?: boolean;
 }
 
 function formatPrice(price: number, currency: string) {
@@ -15,10 +17,16 @@ function formatPrice(price: number, currency: string) {
   }).format(price);
 }
 
-export function SharedGiftCard({ item, onReserve }: SharedGiftCardProps) {
+export function SharedGiftCard({
+  item,
+  onReserve,
+  onPurchase,
+  isPurchasing = false,
+}: SharedGiftCardProps) {
   const isReserved = Boolean(item.is_reserved);
   const isPurchased = item.is_purchased;
   const isFree = !isReserved && !isPurchased;
+  const canPurchase = !isPurchased;
 
   return (
     <article
@@ -71,14 +79,8 @@ export function SharedGiftCard({ item, onReserve }: SharedGiftCardProps) {
         ) : null}
       </div>
 
-      {isFree ? (
-        <Button className="min-h-[44px]" onClick={() => onReserve(item)}>
-          Забронировать
-        </Button>
-      ) : null}
-
       {isReserved ? (
-        <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+        <div className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
           Забронировано: {item.reserved_by?.guest_name ?? 'Гость'}
         </div>
       ) : null}
@@ -87,7 +89,27 @@ export function SharedGiftCard({ item, onReserve }: SharedGiftCardProps) {
         <div className="rounded-2xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white">
           Куплено
         </div>
-      ) : null}
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row">
+          {isFree ? (
+            <Button className="min-h-[44px]" variant="secondary" onClick={() => onReserve(item)}>
+              Забронировать
+            </Button>
+          ) : null}
+
+          {canPurchase ? (
+            <Button
+              className="min-h-[44px]"
+              onClick={() => onPurchase(item)}
+              isLoading={isPurchasing}
+              loadingLabel="Покупка..."
+              disabled={isPurchasing}
+            >
+              Купить
+            </Button>
+          ) : null}
+        </div>
+      )}
     </article>
   );
 }

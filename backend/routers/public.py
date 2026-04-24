@@ -10,6 +10,7 @@ from models.user import User
 from schemas.wishlist import (
     PublicWishlist,
     PublicWishlistItem,
+    PurchaseResponse,
     ReservationRequest,
     ReservationResponse
 )
@@ -163,5 +164,61 @@ async def reserve_item(
     return ReservationResponse(
         message="Подарок успешно забронирован",
         reservation_id=new_reservation.id,
+        item_title=wi.item.title
+    )
+@router.post(
+    "/wishlists/{public_id}/items/{item_id}/purchase",
+    response_model=PurchaseResponse,
+)
+async def purchase_item(
+        public_id: uuid.UUID,
+        item_id: uuid.UUID,
+        request: Request,
+        db: AsyncSession = Depends(get_db)
+):
+    """Покупка подарка гостем по публичной ссылке."""
+    if not register_reservation_attempt(request.client.host):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Rate limit exceeded. Try again later."
+        )
+
+    wl_stmt = select(Wishlist).where(Wishlist.public_id == public_id)
+    wl_res = await db.execute(wl_stmt)
+    wl = wl_res.scalar_one_or_none()
+
+    if not wl:
+        raise HTTPException(status_code=404, detail="Wishlist or item not found")
+    if not wl.is_public:
+        raise HTTPException(status_code=403, detail="This wishlist is private")
+
+    wi_stmt = (
+        select(WishlistItem)
+        .options(joinedload(WishlistItem.item), joinedload(WishlistItem.reservation))
+        .where(
+            WishlistItem.wishlist_id == wl.id,
+            WishlistItem.item_id == item_id
+        )
+    )
+    wi_res = await db.execute(wi_stmt)
+    wi = wi_res.scalar_one_or_none()
+
+    if not wi:
+        raise HTTPException(status_code=404, detail="Wishlist or item not found")
+    if wi.is_purchased:
+        raise HTTPException(status_code=409, detail="This item is already purchased")
+
+    wi.is_purchased = True
+    if wi.reservation:
+        await db.delete(wi.reservation)
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to purchase item")
+
+    return PurchaseResponse(
+        message="Подарок успешно куплен",
         item_title=wi.item.title
     )

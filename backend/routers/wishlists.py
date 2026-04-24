@@ -182,9 +182,6 @@ async def get_wishlist(
     )
 
     # МЕХАНИКА СЮРПРИЗА: Если show_all=False, скрываем забронированные
-    if not show_all:
-        stmt = stmt.outerjoin(Reservation).where(Reservation.id == None)
-
     res = await db.execute(stmt)
     rows = res.scalars().all()
 

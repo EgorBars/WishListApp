@@ -69,3 +69,8 @@ export interface ReservationResponse {
   reservation_id: string;
   item_title: string;
 }
+
+export interface PurchaseResponse {
+  message: string;
+  item_title: string;
+}

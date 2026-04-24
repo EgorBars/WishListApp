@@ -1,6 +1,7 @@
 import api from './axiosInstance';
 import type {
   PublicWishlist,
+  PurchaseResponse,
   ReservationPayload,
   ReservationResponse,
   ShareLinkResponse,
@@ -108,6 +109,19 @@ export async function reserveItem(
   const { data } = await api.post<ReservationResponse>(
     `/public/wishlists/${publicId}/items/${itemId}/reserve`,
     payload,
+    { signal },
+  );
+  return data;
+}
+
+export async function purchasePublicItem(
+  publicId: string,
+  itemId: string,
+  signal?: AbortSignal,
+): Promise<PurchaseResponse> {
+  const { data } = await api.post<PurchaseResponse>(
+    `/public/wishlists/${publicId}/items/${itemId}/purchase`,
+    undefined,
     { signal },
   );
   return data;

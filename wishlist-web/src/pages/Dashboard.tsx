@@ -196,7 +196,7 @@ export default function Dashboard() {
             const itemsCount = list.items_count || 0;
             const reservedCount = list.reserved_count || 0;
             const purchasedCount = list.purchased_count || 0;
-            const progressValue = itemsCount > 0 ? Math.min((reservedCount / itemsCount) * 100, 100) : 0;
+            const progressValue = itemsCount > 0 ? Math.min((purchasedCount / itemsCount) * 100, 100) : 0;
 
             return (
               <article
@@ -236,7 +236,7 @@ export default function Dashboard() {
                   <div className="mb-3 flex items-center justify-between text-sm font-semibold text-gray-700">
                     <span>Прогресс списка</span>
                     <span>
-                      {reservedCount}/{itemsCount || 0}
+                      {purchasedCount}/{itemsCount || 0}
                     </span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-white">

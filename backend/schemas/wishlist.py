@@ -1,5 +1,5 @@
-import uuid
 import re
+import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
@@ -7,20 +7,14 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
-# --- Базовые вспомогательные схемы ---
-
 class ReservationInfo(BaseModel):
-    """Информация о бронировании для отображения владельцу или гостю"""
     guest_name: str
     reserved_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- Схемы для Списков желаний (Wishlist) ---
-
 class WishlistSummary(BaseModel):
-    """Схема для списка на дашборде с индикаторами прогресса"""
     id: uuid.UUID
     title: str
     description: Optional[str] = None
@@ -48,7 +42,6 @@ class WishlistUpdate(BaseModel):
 
 
 class WishlistOut(BaseModel):
-    """Краткий вывод инфо о списке после создания/обновления"""
     id: uuid.UUID
     title: str
     description: Optional[str] = None
@@ -60,10 +53,7 @@ class WishlistOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- Схемы для Товаров (Items) ---
-
 class WishlistItemInList(BaseModel):
-    """Товар в детальном представлении для ВЛАДЕЛЬЦА (с поддержкой 'Сюрприза')"""
     id: uuid.UUID
     title: str
     price: Decimal
@@ -81,7 +71,6 @@ class WishlistItemInList(BaseModel):
 
 
 class WishlistDetail(BaseModel):
-    """Полная информация о списке для владельца"""
     id: uuid.UUID
     title: str
     description: Optional[str] = None
@@ -115,7 +104,6 @@ class WishlistItemUpdate(BaseModel):
 
 
 class WishlistItemOut(BaseModel):
-    """Результат добавления/изменения товара"""
     id: uuid.UUID
     title: str
     price: Decimal
@@ -130,16 +118,12 @@ class WishlistItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- НОВЫЕ СХЕМЫ SPRINT 4: Публичный доступ и Шеринг ---
-
 class ShareLinkResponse(BaseModel):
-    """Ответ на запрос генерации ссылки для шеринга"""
     public_id: uuid.UUID
     share_url: str
 
 
 class PublicWishlistItem(BaseModel):
-    """Товар в публичном списке (скрыты приватные поля вроде note)"""
     id: uuid.UUID
     title: str
     price: Decimal
@@ -149,14 +133,12 @@ class PublicWishlistItem(BaseModel):
     priority: int
     is_purchased: bool
     is_reserved: bool
-    # Гости видят только имя того, кто забронировал
-    reserved_by: Optional[dict] = None # {"guest_name": "..."}
+    reserved_by: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class PublicWishlist(BaseModel):
-    """Схема для публичного просмотра гостями"""
     id: uuid.UUID
     title: str
     description: Optional[str] = None
@@ -166,24 +148,24 @@ class PublicWishlist(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- Схемы Бронирования (Reservation) ---
-
 class ReservationRequest(BaseModel):
-    """Запрос на бронирование от гостя"""
     guest_name: str = Field(..., min_length=2, max_length=100)
     guest_email: EmailStr = Field(..., max_length=255)
 
     @field_validator("guest_name")
     @classmethod
-    def validate_guest_name(cls, v: str) -> str:
-        # Разрешаем буквы разных алфавитов и пробелы
-        if not re.match(r"^[A-Za-zА-Яа-яЁёІіЇїЄєЎў\s]+$", v):
+    def validate_guest_name(cls, value: str) -> str:
+        if not re.match(r"^[A-Za-zА-Яа-яЁёІіЇїЄєЎў\s]+$", value):
             raise ValueError("Имя должно содержать только буквы и пробелы")
-        return v.strip()
+        return value.strip()
 
 
 class ReservationResponse(BaseModel):
-    """Успешный ответ после бронирования"""
     message: str
     reservation_id: uuid.UUID
+    item_title: str
+
+
+class PurchaseResponse(BaseModel):
+    message: str
     item_title: str

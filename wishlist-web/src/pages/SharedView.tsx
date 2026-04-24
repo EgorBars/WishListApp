@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import axios from 'axios';
 import { Gift, Link2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
+import { purchasePublicItem } from '../api/wishlistsApi';
 import { SharedGiftCard } from '../components/shared/SharedGiftCard';
 import { ReservationModal } from '../components/shared/ReservationModal';
 import { usePublicWishlist } from '../hooks/usePublicWishlist';
@@ -35,6 +37,7 @@ export default function SharedView() {
   const { wishlist, loading, error, patchItem } = usePublicWishlist(publicId);
   const { showToast } = useToast();
   const [selectedItem, setSelectedItem] = useState<WishlistItem | null>(null);
+  const [purchasingItemId, setPurchasingItemId] = useState<string | null>(null);
 
   const closeModal = () => setSelectedItem(null);
 
@@ -42,6 +45,7 @@ export default function SharedView() {
     if (!selectedItem) return;
     patchItem(selectedItem.id, {
       is_reserved: true,
+      is_purchased: false,
       reserved_by: { guest_name: payload.guest_name },
     });
     closeModal();
@@ -60,6 +64,35 @@ export default function SharedView() {
     patchItem(selectedItem.id, { is_purchased: true, is_reserved: false, reserved_by: null });
     closeModal();
     showToast('Этот подарок уже куплен.');
+  };
+
+  const handlePurchase = async (item: WishlistItem) => {
+    setPurchasingItemId(item.id);
+
+    try {
+      await purchasePublicItem(publicId, item.id);
+      patchItem(item.id, { is_purchased: true, is_reserved: false, reserved_by: null });
+      showToast('Подарок отмечен как купленный.');
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+
+        if (status === 409 || status === 400) {
+          patchItem(item.id, { is_purchased: true, is_reserved: false, reserved_by: null });
+          showToast('Этот подарок уже куплен.');
+          return;
+        }
+
+        if (status === 429) {
+          showToast('Слишком много попыток. Попробуйте позже.');
+          return;
+        }
+      }
+
+      showToast('Не удалось отметить подарок как купленный.');
+    } finally {
+      setPurchasingItemId(null);
+    }
   };
 
   if (loading) return <SharedViewSkeleton />;
@@ -88,14 +121,20 @@ export default function SharedView() {
             {wishlist.items.length > 0 ? (
               <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {wishlist.items.map((item) => (
-                  <SharedGiftCard key={item.id} item={item} onReserve={setSelectedItem} />
+                  <SharedGiftCard
+                    key={item.id}
+                    item={item}
+                    onReserve={setSelectedItem}
+                    onPurchase={(nextItem) => void handlePurchase(nextItem)}
+                    isPurchasing={purchasingItemId === item.id}
+                  />
                 ))}
               </section>
             ) : (
               <section className="rounded-[32px] border border-dashed border-gray-200 bg-white px-6 py-16 text-center">
                 <Gift className="mx-auto mb-4 text-gray-300" size={40} />
                 <h2 className="text-xl font-bold text-gray-900">В этом списке пока нет подарков</h2>
-                <p className="mt-2 text-gray-500">Загляните позже — владелец может добавить новые идеи.</p>
+                <p className="mt-2 text-gray-500">Загляните позже, владелец может добавить новые идеи.</p>
               </section>
             )}
           </>
