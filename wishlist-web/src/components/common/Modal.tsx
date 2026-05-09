@@ -10,9 +10,9 @@ interface ModalProps {
 }
 
 const sizeClassMap = {
-  sm: 'max-w-md',
-  md: 'max-w-xl',
-  lg: 'max-w-3xl',
+  sm: 'sm:max-w-md',
+  md: 'sm:max-w-xl',
+  lg: 'sm:max-w-3xl',
 } as const;
 
 export const Modal: React.FC<ModalProps> = ({
@@ -42,7 +42,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 md:p-6"
       role="dialog"
       aria-modal="true"
     >
@@ -53,10 +53,10 @@ export const Modal: React.FC<ModalProps> = ({
       />
 
       <div
-        className={`relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl animate-in fade-in zoom-in duration-300 ${sizeClassMap[size]}`}
+        className={`relative flex max-h-[95vh] w-[95%] flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl animate-in fade-in zoom-in duration-300 ${sizeClassMap[size]}`}
       >
-        <div className="flex items-center justify-between border-b border-gray-50 p-6">
-          <h3 className="text-2xl font-extrabold tracking-tight text-gray-900">{title}</h3>
+        <div className="flex items-center justify-between border-b border-gray-50 p-4 sm:p-6">
+          <h3 className="text-lg font-extrabold tracking-tight text-gray-900 sm:text-2xl">{title}</h3>
           <button
             onClick={onClose}
             className="rounded-2xl p-2 text-gray-400 transition-all hover:bg-indigo-50 hover:text-brand-primary focus:outline-none focus:ring-4 focus:ring-indigo-50 active:scale-90"
@@ -66,7 +66,7 @@ export const Modal: React.FC<ModalProps> = ({
           </button>
         </div>
 
-        <div className="overflow-y-auto p-6 sm:p-8">{children}</div>
+        <div className="overflow-y-auto p-4 sm:p-6 md:p-8">{children}</div>
       </div>
     </div>
   );

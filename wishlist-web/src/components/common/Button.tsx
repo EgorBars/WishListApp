@@ -18,7 +18,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   // Базовые стили согласно п. 5.1.3 (Default, Focus, Disabled)
-  const baseStyles = "w-full py-3.5 px-6 rounded-2xl font-bold transition-all duration-200 focus:outline-none focus:ring-4 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]";
+  const baseStyles = "w-full min-h-[44px] py-3.5 px-6 rounded-2xl font-bold transition-all duration-200 focus:outline-none focus:ring-4 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]";
   
   // Варианты оформления (п. 4.11)
   const variants = {

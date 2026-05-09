@@ -22,7 +22,7 @@ export const Input: React.FC<InputProps> = ({ label, error, className = '', id, 
       <input
         id={inputId}
         className={`
-          w-full px-4 py-3 rounded-2xl border transition-all outline-none
+          w-full min-h-[44px] px-4 py-3 rounded-2xl border transition-all outline-none
           ${error 
             ? 'border-brand-error focus:ring-2 focus:ring-red-200 bg-red-50/30' 
             : 'border-gray-200 focus:border-brand-primary focus:ring-4 focus:ring-indigo-50 bg-white'

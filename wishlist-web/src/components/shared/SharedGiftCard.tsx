@@ -1,4 +1,4 @@
-import { ExternalLink, Gift, Star } from 'lucide-react';
+import { ExternalLink, Gift, Star, X } from 'lucide-react';
 import { Button } from '../common/Button';
 import type { WishlistItem } from '../../types';
 
@@ -6,7 +6,10 @@ interface SharedGiftCardProps {
   item: WishlistItem;
   onReserve: (item: WishlistItem) => void;
   onPurchase: (item: WishlistItem) => void;
+  onCancelReservation?: (itemId: string) => void;
+  isGuestReservedItem?: boolean;
   isPurchasing?: boolean;
+  isCancelingReservation?: boolean;
 }
 
 function formatPrice(price: number, currency: string) {
@@ -21,7 +24,10 @@ export function SharedGiftCard({
   item,
   onReserve,
   onPurchase,
+  onCancelReservation,
+  isGuestReservedItem = false,
   isPurchasing = false,
+  isCancelingReservation = false,
 }: SharedGiftCardProps) {
   const isReserved = Boolean(item.is_reserved);
   const isPurchased = item.is_purchased;
@@ -80,8 +86,24 @@ export function SharedGiftCard({
       </div>
 
       {isReserved ? (
-        <div className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-          Забронировано: {item.reserved_by?.guest_name ?? 'Гость'}
+        <div className="mb-3">
+          {isGuestReservedItem ? (
+            <Button
+              className="min-h-[44px] w-full"
+              variant="secondary"
+              onClick={() => onCancelReservation?.(item.id)}
+              isLoading={isCancelingReservation}
+              loadingLabel="Отмена..."
+              disabled={isCancelingReservation}
+            >
+              <X size={18} className="mr-2" />
+              Отменить мою бронь
+            </Button>
+          ) : (
+            <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+              Забронировано: {item.reserved_by?.guest_name ?? 'Гость'}
+            </div>
+          )}
         </div>
       ) : null}
 

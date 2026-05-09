@@ -138,7 +138,7 @@ export function ReservationModal({
           </p>
         ) : null}
 
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-3">
           <Button variant="secondary" type="button" onClick={handleClose} disabled={isSubmitting}>
             Отмена
           </Button>
