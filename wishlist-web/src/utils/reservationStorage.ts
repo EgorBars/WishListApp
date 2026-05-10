@@ -4,11 +4,13 @@
 
 interface GuestReservation {
   wishlist_item_id: string;
-  reservation_token: string;
+  reservation_id: string;      // UUID брони (нужен для DELETE URL)
+  reservation_token: string;   // токен (нужен для тела запроса)
 }
 
 interface StoredReservation {
   wishlist_item_id: string;
+  reservation_id: string;
   reservation_token: string;
   timestamp: number;
 }
@@ -18,10 +20,11 @@ const STORAGE_KEY = 'guest_reservations';
 /**
  * Сохраняет бронирование гостя в LocalStorage
  */
-export function saveGuestReservation(itemId: string, token: string): void {
+export function saveGuestReservation(itemId: string, reservationId: string, token: string): void {
   try {
     const reservation: StoredReservation = {
       wishlist_item_id: itemId,
+      reservation_id: reservationId,
       reservation_token: token,
       timestamp: Date.now(),
     };
@@ -62,6 +65,15 @@ export function getReservationToken(itemId: string): string | null {
   const reservations = getAllReservations();
   const reservation = reservations[itemId];
   return reservation ? reservation.reservation_token : null;
+}
+
+/**
+ * Получает UUID бронирования для конкретного товара
+ */
+export function getReservationId(itemId: string): string | null {
+  const reservations = getAllReservations();
+  const reservation = reservations[itemId];
+  return reservation ? reservation.reservation_id : null;
 }
 
 /**

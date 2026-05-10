@@ -11,6 +11,7 @@ import { useToast } from '../context/ToastContext';
 import {
   isItemReservedByGuest,
   getReservationToken,
+  getReservationId,
   removeGuestReservation,
 } from '../utils/reservationStorage';
 import type { ReservationPayload, WishlistItem } from '../types';
@@ -77,12 +78,13 @@ export default function SharedView() {
     setCancelingReservationId(itemId);
     try {
       const token = getReservationToken(itemId);
-      if (!token) {
+      const reservationId = getReservationId(itemId);
+      if (!token || !reservationId) {
         showToast('Ошибка: токен бронирования не найден.');
         return;
       }
 
-      await cancelGuestReservation(token);
+      await cancelGuestReservation(reservationId, token);
       removeGuestReservation(itemId);
       patchItem(itemId, { is_reserved: false, reserved_by: null });
       showToast('Ваша бронь успешно отменена.');

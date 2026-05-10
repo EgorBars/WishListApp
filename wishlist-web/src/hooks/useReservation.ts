@@ -60,7 +60,7 @@ export function useReservation() {
           controller.signal,
         );
         // Сохраняем информацию о бронировании в LocalStorage для гостя
-        saveGuestReservation(itemId, result.reservation_token);
+        saveGuestReservation(itemId, result.reservation_id, result.reservation_token);
         return { ok: true as const, data: result };
       } catch (error) {
         if (axios.isCancel(error)) {

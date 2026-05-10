@@ -1,5 +1,6 @@
 import re
 import json
+import asyncio
 from decimal import Decimal
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -14,16 +15,8 @@ ua = UserAgent()
 
 class ScraperService:
     def __init__(self):
-        settings = get_settings()
-        self.timeout = httpx.Timeout(
-            settings.scraper_timeout_seconds,
-            connect=settings.scraper_connect_timeout_seconds,
-            read=settings.scraper_read_timeout_seconds,
-        )
-        self.headers = {
-            "User-Agent": settings.scraper_user_agent or ua.random,
-            "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-        }
+        self.timeout = httpx.Timeout(7.0, connect=2.0, read=3.0)
+        self.headers = {"User-Agent": ua.random}
 
     async def parse_url(self, url: str) -> dict:
         # 1. SSRF Protection
@@ -52,13 +45,13 @@ class ScraperService:
         return not any(host.startswith(f) for f in forbidden)
 
     async def _parse_wildberries(self, url: str) -> dict:
-        # Извлекаем SKU (артикул) из ссылки
-        match = re.search(r"catalog/(\+?\d+)/detail", url)
+        # FIX 1: /detail теперь опциональный — матчит любой формат WB-ссылки
+        match = re.search(r"/catalog/(\d+)", url)
         if not match:
             return await self._parse_generic(url)
 
         sku = match.group(1)
-        # API WB для получения деталей (используем корзины)
+        # API WB для получения деталей
         api_url = f"https://card.wb.ru/cards/v1/detail?appType=1&curr=byn&dest=-1257786&spp=30&nm={sku}"
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -72,12 +65,12 @@ class ScraperService:
                 return {"url": url, "currency": "BYN"}
 
             p = products[0]
-            # Генерация ссылки на фото для WB (упрощенно)
+            # Генерация ссылки на фото для WB
             vol = int(sku) // 100000
             part = int(sku) // 1000
-            # Выбор хоста (обычно basket-01...15)
             basket = f"{p.get('dist', 1):02d}"
-            img_url = f"https://basket-{basket}.wb.ru/vol{vol}/part{part}/{sku}/images/big/1.webp"
+            # FIX 2: CDN WB переехал с wb.ru на wbbasket.ru
+            img_url = f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{sku}/images/big/1.webp"
 
             return {
                 "title": p.get("name"),
@@ -99,7 +92,8 @@ class ScraperService:
             result = {
                 "title": self._get_title(soup),
                 "price": self._get_price(soup),
-                "currency": "BYN",  # Default
+                # FIX 3: определяем валюту из разметки вместо хардкода BYN
+                "currency": self._get_currency(soup),
                 "image_url": self._get_image(soup, url),
                 "url": url
             }
@@ -141,6 +135,36 @@ class ScraperService:
         if og_price: return self._clean_price(og_price.get("content"))
 
         return None
+
+    def _get_currency(self, soup: BeautifulSoup) -> str:
+        """Определяем валюту из JSON-LD или OpenGraph, иначе BYN."""
+        # 1. JSON-LD offers.priceCurrency
+        for script in soup.find_all("script", type="application/ld+json"):
+            try:
+                data = json.loads(script.string)
+                if data.get("@type") == "Product":
+                    offers = data.get("offers")
+                    cur = None
+                    if isinstance(offers, dict):
+                        cur = offers.get("priceCurrency")
+                    elif isinstance(offers, list) and offers:
+                        cur = offers[0].get("priceCurrency")
+                    if cur and cur.upper() in ("EUR", "USD", "BYN"):
+                        return cur.upper()
+            except:
+                continue
+
+        # 2. OpenGraph
+        og_cur = (
+            soup.find("meta", property="product:price:currency") or
+            soup.find("meta", property="og:price:currency")
+        )
+        if og_cur:
+            val = (og_cur.get("content") or "").upper()
+            if val in ("EUR", "USD", "BYN"):
+                return val
+
+        return "BYN"
 
     def _get_image(self, soup: BeautifulSoup, base_url: str) -> Optional[str]:
         og_img = soup.find("meta", property="og:image")

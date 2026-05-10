@@ -148,8 +148,12 @@ export async function parseItemUrl(
 }
 
 export async function cancelGuestReservation(
+  reservationId: string,
   reservationToken: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  await api.delete(`/public/reservations/${reservationToken}`, { signal });
+  await api.delete(`/public/reservations/${reservationId}`, {
+    data: { reservation_token: reservationToken },
+    signal,
+  });
 }
