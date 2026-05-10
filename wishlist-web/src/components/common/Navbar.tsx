@@ -17,7 +17,7 @@ export const Navbar = () => {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 min-h-[44px] items-center justify-between gap-4">
           <Link to="/dashboard" className="flex items-center gap-2 text-lg font-bold text-brand-primary sm:text-xl">
-            <Gift size={24} className="sm:size-28" />
+            <Gift size={20} className="sm:size-6" />
             <span className="hidden sm:inline">WishList App</span>
           </Link>
 
@@ -27,10 +27,11 @@ export const Navbar = () => {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex min-h-[44px] min-w-[44px] items-center gap-2 text-xs font-medium text-gray-500 transition-colors hover:text-brand-error sm:text-sm"
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 sm:gap-2 rounded-lg px-2 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-brand-error sm:px-3 sm:text-sm"
                 aria-label="Выйти из аккаунта"
+                title="Выйти"
               >
-                <LogOut size={18} />
+                <LogOut size={16} className="sm:size-5" />
                 <span className="hidden sm:inline">Выйти</span>
               </button>
             </div>

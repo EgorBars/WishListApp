@@ -32,7 +32,7 @@ export function SharedGiftCard({
   const isReserved = Boolean(item.is_reserved);
   const isPurchased = item.is_purchased;
   const isFree = !isReserved && !isPurchased;
-  const canPurchase = !isPurchased;
+  const canPurchase = !isPurchased && !isReserved;
 
   return (
     <article
@@ -57,27 +57,27 @@ export function SharedGiftCard({
         )}
       </div>
 
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <h3 className="line-clamp-2 text-lg font-bold leading-tight text-gray-900">{item.title}</h3>
-        <div className="flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <h3 className="line-clamp-2 text-sm sm:text-lg font-bold leading-tight text-gray-900">{item.title}</h3>
+        <div className="flex shrink-0 items-center gap-0.5 rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
           {Array.from({ length: 5 }).map((_, index) => (
             <Star
               key={index}
-              size={12}
-              className={index < item.priority ? 'fill-current' : 'opacity-30'}
+              size={10}
+              className={`${index < item.priority ? 'fill-current' : 'opacity-30'}`}
             />
           ))}
         </div>
       </div>
 
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-base font-bold text-brand-primary">{formatPrice(item.price, item.currency)}</p>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <p className="text-sm sm:text-base font-bold text-brand-primary">{formatPrice(item.price, item.currency)}</p>
         {item.url ? (
           <a
             href={item.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-200"
+            className="inline-flex items-center gap-0.5 rounded-full bg-gray-100 px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-200 shrink-0"
           >
             Открыть
             <ExternalLink size={13} />

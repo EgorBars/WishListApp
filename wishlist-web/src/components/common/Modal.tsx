@@ -53,20 +53,20 @@ export const Modal: React.FC<ModalProps> = ({
       />
 
       <div
-        className={`relative flex max-h-[95vh] w-[95%] flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl animate-in fade-in zoom-in duration-300 ${sizeClassMap[size]}`}
+        className={`relative flex max-h-[90vh] w-[min(95vw,100%)] flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl animate-in fade-in zoom-in duration-300 sm:w-[95%] ${sizeClassMap[size]}`}
       >
-        <div className="flex items-center justify-between border-b border-gray-50 p-4 sm:p-6">
-          <h3 className="text-lg font-extrabold tracking-tight text-gray-900 sm:text-2xl">{title}</h3>
+        <div className="flex items-center justify-between border-b border-gray-50 gap-3 p-3 sm:p-6">
+          <h3 className="flex-1 text-base font-extrabold tracking-tight text-gray-900 sm:text-2xl">{title}</h3>
           <button
             onClick={onClose}
-            className="rounded-2xl p-2 text-gray-400 transition-all hover:bg-indigo-50 hover:text-brand-primary focus:outline-none focus:ring-4 focus:ring-indigo-50 active:scale-90"
+            className="shrink-0 rounded-2xl p-2 text-gray-400 transition-all hover:bg-indigo-50 hover:text-brand-primary focus:outline-none focus:ring-4 focus:ring-indigo-50 active:scale-90"
             aria-label="Закрыть модальное окно"
           >
-            <X size={24} />
+            <X size={20} className="sm:size-6" />
           </button>
         </div>
 
-        <div className="overflow-y-auto p-4 sm:p-6 md:p-8">{children}</div>
+        <div className="overflow-y-auto p-3 sm:p-6 md:p-8">{children}</div>
       </div>
     </div>
   );

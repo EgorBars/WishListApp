@@ -90,8 +90,7 @@ export default function SharedView() {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
 
-        if (status === 404 || status === 401) {
-          // Бронирование уже не существует или невалидный токен
+        if (status === 404 || status === 401 || status === 422) {
           removeGuestReservation(itemId);
           patchItem(itemId, { is_reserved: false, reserved_by: null });
           showToast('Бронирование уже отменено.');
@@ -103,9 +102,32 @@ export default function SharedView() {
           return;
         }
       }
-const ogTitle = wishlist ? `Вишлист: ${wishlist.title}` : 'WishList App';
+      showToast('Ошибка при отмене бронирования.');
+    } finally {
+      setCancelingReservationId(null);
+    }
+  };
+
+  const handlePurchase = async (item: WishlistItem) => {
+    setPurchasingItemId(item.id);
+    try {
+      await purchasePublicItem(publicId, item.id);
+      patchItem(item.id, { is_purchased: true, is_reserved: false, reserved_by: null });
+      showToast('Подарок успешно куплен!');
+    } catch {
+      showToast('Ошибка при покупке подарка.');
+    } finally {
+      setPurchasingItemId(null);
+    }
+  };
+
+  const ogTitle = wishlist ? `Вишлист: ${wishlist.title}` : 'WishList App';
   const ogDescription = 'Посмотри мои желания и забронируй подарок!';
   const ogImage = `${window.location.origin}/vite.svg`;
+
+  if (loading) {
+    return <SharedViewSkeleton />;
+  }
 
   return (
     <>
@@ -138,7 +160,7 @@ const ogTitle = wishlist ? `Вишлист: ${wishlist.title}` : 'WishList App';
               </section>
 
               {wishlist.items.length > 0 ? (
-                <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                   {wishlist.items.map((item) => {
                     const isGuestReserved = isItemReservedByGuest(item.id);
                     return (
@@ -146,7 +168,7 @@ const ogTitle = wishlist ? `Вишлист: ${wishlist.title}` : 'WishList App';
                         key={item.id}
                         item={item}
                         onReserve={setSelectedItem}
-                        onPurchase={(nextItem) => void handlePurchase(nextItem)}
+                        onPurchase={handlePurchase}
                         onCancelReservation={handleCancelReservation}
                         isGuestReservedItem={isGuestReserved}
                         isPurchasing={purchasingItemId === item.id}
@@ -182,44 +204,6 @@ const ogTitle = wishlist ? `Вишлист: ${wishlist.title}` : 'WishList App';
           onAlreadyPurchased={markPurchased}
         />
       </div>
-    </   {wishlist.items.length > 0 ? (
-              <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {wishlist.items.map((item) => (
-                  <SharedGiftCard
-                    key={item.id}
-                    item={item}
-                    onReserve={setSelectedItem}
-                    onPurchase={(nextItem) => void handlePurchase(nextItem)}
-                    isPurchasing={purchasingItemId === item.id}
-                  />
-                ))}
-              </section>
-            ) : (
-              <section className="rounded-[32px] border border-dashed border-gray-200 bg-white px-6 py-16 text-center">
-                <Gift className="mx-auto mb-4 text-gray-300" size={40} />
-                <h2 className="text-xl font-bold text-gray-900">В этом списке пока нет подарков</h2>
-                <p className="mt-2 text-gray-500">Загляните позже, владелец может добавить новые идеи.</p>
-              </section>
-            )}
-          </>
-        ) : (
-          <section className="mx-auto max-w-2xl rounded-[32px] border border-red-100 bg-white px-6 py-16 text-center shadow-sm">
-            <Gift className="mx-auto mb-4 text-red-300" size={40} />
-            <h1 className="text-2xl font-black text-gray-900">Список недоступен</h1>
-            <p className="mt-3 text-gray-600">{error}</p>
-          </section>
-        )}
-      </div>
-
-      <ReservationModal
-        isOpen={Boolean(selectedItem) && Boolean(wishlist)}
-        item={selectedItem}
-        publicId={publicId}
-        onClose={closeModal}
-        onSuccess={markReserved}
-        onAlreadyReserved={markAlreadyReserved}
-        onAlreadyPurchased={markPurchased}
-      />
-    </div>
+    </>
   );
 }

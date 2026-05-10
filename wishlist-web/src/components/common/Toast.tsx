@@ -57,7 +57,7 @@ export const Toast: React.FC<ToastProps> = ({
         fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96
         z-50
         flex items-center gap-3
-        px-4 py-4
+        px-3 py-3 sm:px-4 sm:py-4
         rounded-2xl
         border
         ${bg} ${border}
@@ -65,14 +65,14 @@ export const Toast: React.FC<ToastProps> = ({
       `}
       role="alert"
     >
-      <Icon size={20} className={icon} />
-      <p className={`flex-1 text-sm font-medium ${text}`}>{message}</p>
+      <Icon size={18} className={`${icon} shrink-0`} />
+      <p className={`flex-1 text-xs sm:text-sm font-medium ${text} break-words`}>{message}</p>
       <button
         onClick={onClose}
-        className={`p-1 hover:bg-white/50 rounded transition-colors text-gray-400 hover:text-gray-600`}
+        className={`p-1 shrink-0 hover:bg-white/50 rounded transition-colors text-gray-400 hover:text-gray-600`}
         aria-label="Закрыть уведомление"
       >
-        <X size={16} />
+        <X size={14} />
       </button>
     </div>
   );
