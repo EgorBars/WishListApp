@@ -146,3 +146,10 @@ export async function parseItemUrl(
   );
   return data;
 }
+
+export async function cancelGuestReservation(
+  reservationToken: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  await api.delete(`/public/reservations/${reservationToken}`, { signal });
+}

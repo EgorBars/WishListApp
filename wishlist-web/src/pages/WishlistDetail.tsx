@@ -214,6 +214,28 @@ export default function WishlistDetail() {
     setSharing(true);
     try {
       const response = await getShareLink(list.id);
+      
+      // Пытаемся использовать Web Share API для мобильных устройств
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: `Вишлист: ${list.title}`,
+            text: 'Посмотри мои желания и забронируй подарок!',
+            url: response.share_url,
+          });
+          setList((current) =>
+            current
+              ? { ...current, is_public: true, public_id: response.public_id, share_url: response.share_url }
+              : current,
+          );
+          showToast('Ссылка поделена!');
+          return;
+        } catch {
+          // Если пользователь отменил Web Share API, продолжаем с Clipboard API
+        }
+      }
+
+      // Fallback на Clipboard API
       try {
         await navigator.clipboard.writeText(response.share_url);
       } catch {

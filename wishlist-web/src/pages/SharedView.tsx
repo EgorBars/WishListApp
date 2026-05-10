@@ -1,12 +1,18 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { Helmet } from 'react-helmet-async';
 import { Gift, Link2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
-import { purchasePublicItem } from '../api/wishlistsApi';
+import { cancelGuestReservation, purchasePublicItem } from '../api/wishlistsApi';
 import { SharedGiftCard } from '../components/shared/SharedGiftCard';
 import { ReservationModal } from '../components/shared/ReservationModal';
 import { usePublicWishlist } from '../hooks/usePublicWishlist';
 import { useToast } from '../context/ToastContext';
+import {
+  isItemReservedByGuest,
+  getReservationToken,
+  removeGuestReservation,
+} from '../utils/reservationStorage';
 import type { ReservationPayload, WishlistItem } from '../types';
 
 function SharedViewSkeleton() {
@@ -38,6 +44,7 @@ export default function SharedView() {
   const { showToast } = useToast();
   const [selectedItem, setSelectedItem] = useState<WishlistItem | null>(null);
   const [purchasingItemId, setPurchasingItemId] = useState<string | null>(null);
+  const [cancelingReservationId, setCancelingReservationId] = useState<string | null>(null);
 
   const closeModal = () => setSelectedItem(null);
 
@@ -66,20 +73,28 @@ export default function SharedView() {
     showToast('Этот подарок уже куплен.');
   };
 
-  const handlePurchase = async (item: WishlistItem) => {
-    setPurchasingItemId(item.id);
-
+  const handleCancelReservation = async (itemId: string) => {
+    setCancelingReservationId(itemId);
     try {
-      await purchasePublicItem(publicId, item.id);
-      patchItem(item.id, { is_purchased: true, is_reserved: false, reserved_by: null });
-      showToast('Подарок отмечен как купленный.');
+      const token = getReservationToken(itemId);
+      if (!token) {
+        showToast('Ошибка: токен бронирования не найден.');
+        return;
+      }
+
+      await cancelGuestReservation(token);
+      removeGuestReservation(itemId);
+      patchItem(itemId, { is_reserved: false, reserved_by: null });
+      showToast('Ваша бронь успешно отменена.');
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
 
-        if (status === 409 || status === 400) {
-          patchItem(item.id, { is_purchased: true, is_reserved: false, reserved_by: null });
-          showToast('Этот подарок уже куплен.');
+        if (status === 404 || status === 401) {
+          // Бронирование уже не существует или невалидный токен
+          removeGuestReservation(itemId);
+          patchItem(itemId, { is_reserved: false, reserved_by: null });
+          showToast('Бронирование уже отменено.');
           return;
         }
 
@@ -88,37 +103,86 @@ export default function SharedView() {
           return;
         }
       }
-
-      showToast('Не удалось отметить подарок как купленный.');
-    } finally {
-      setPurchasingItemId(null);
-    }
-  };
-
-  if (loading) return <SharedViewSkeleton />;
+const ogTitle = wishlist ? `Вишлист: ${wishlist.title}` : 'WishList App';
+  const ogDescription = 'Посмотри мои желания и забронируй подарок!';
+  const ogImage = `${window.location.origin}/vite.svg`;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,245,205,0.55),_transparent_38%),linear-gradient(180deg,#fffdf7_0%,#f7f8fc_100%)]">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {wishlist ? (
-          <>
-            <section className="mb-10 overflow-hidden rounded-[36px] border border-white/70 bg-white/90 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
-                <Link2 size={14} />
-                Публичный список
-              </div>
-              <h1 className="max-w-3xl text-3xl font-black tracking-tight text-gray-900 sm:text-5xl">
-                {wishlist.title}
-              </h1>
-              <p className="mt-4 text-sm font-medium uppercase tracking-[0.22em] text-gray-400">
-                Владелец: {wishlist.owner_name}
-              </p>
-              {wishlist.description ? (
-                <p className="mt-6 max-w-3xl text-lg leading-8 text-gray-600">{wishlist.description}</p>
-              ) : null}
-            </section>
+    <>
+      <Helmet>
+        <title>{ogTitle}</title>
+        <meta name="description" content={ogDescription} />
+        <meta property="og:title" content={ogTitle} />
+        <meta property="og:description" content={ogDescription} />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:type" content="website" />
+      </Helmet>
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,245,205,0.55),_transparent_38%),linear-gradient(180deg,#fffdf7_0%,#f7f8fc_100%)]">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          {wishlist ? (
+            <>
+              <section className="mb-10 overflow-hidden rounded-[36px] border border-white/70 bg-white/90 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
+                  <Link2 size={14} />
+                  Публичный список
+                </div>
+                <h1 className="max-w-3xl text-3xl font-black tracking-tight text-gray-900 sm:text-5xl">
+                  {wishlist.title}
+                </h1>
+                <p className="mt-4 text-sm font-medium uppercase tracking-[0.22em] text-gray-400">
+                  Владелец: {wishlist.owner_name}
+                </p>
+                {wishlist.description ? (
+                  <p className="mt-6 max-w-3xl text-lg leading-8 text-gray-600">{wishlist.description}</p>
+                ) : null}
+              </section>
 
-            {wishlist.items.length > 0 ? (
+              {wishlist.items.length > 0 ? (
+                <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {wishlist.items.map((item) => {
+                    const isGuestReserved = isItemReservedByGuest(item.id);
+                    return (
+                      <SharedGiftCard
+                        key={item.id}
+                        item={item}
+                        onReserve={setSelectedItem}
+                        onPurchase={(nextItem) => void handlePurchase(nextItem)}
+                        onCancelReservation={handleCancelReservation}
+                        isGuestReservedItem={isGuestReserved}
+                        isPurchasing={purchasingItemId === item.id}
+                        isCancelingReservation={cancelingReservationId === item.id}
+                      />
+                    );
+                  })}
+                </section>
+              ) : (
+                <section className="rounded-[32px] border border-dashed border-gray-200 bg-white px-6 py-16 text-center">
+                  <Gift className="mx-auto mb-4 text-gray-300" size={40} />
+                  <h2 className="text-xl font-bold text-gray-900">В этом списке пока нет подарков</h2>
+                  <p className="mt-2 text-gray-500">Загляните позже, владелец может добавить новые идеи.</p>
+                </section>
+              )}
+            </>
+          ) : (
+            <section className="mx-auto max-w-2xl rounded-[32px] border border-red-100 bg-white px-6 py-16 text-center shadow-sm">
+              <Gift className="mx-auto mb-4 text-red-300" size={40} />
+              <h1 className="text-2xl font-black text-gray-900">Список недоступен</h1>
+              <p className="mt-3 text-gray-600">{error}</p>
+            </section>
+          )}
+        </div>
+
+        <ReservationModal
+          isOpen={Boolean(selectedItem) && Boolean(wishlist)}
+          item={selectedItem}
+          publicId={publicId}
+          onClose={closeModal}
+          onSuccess={markReserved}
+          onAlreadyReserved={markAlreadyReserved}
+          onAlreadyPurchased={markPurchased}
+        />
+      </div>
+    </   {wishlist.items.length > 0 ? (
               <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {wishlist.items.map((item) => (
                   <SharedGiftCard

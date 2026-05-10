@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import axios from 'axios';
 import { reserveItem } from '../api/wishlistsApi';
+import { saveGuestReservation } from '../utils/reservationStorage';
 import type { ReservationPayload, ReservationResponse } from '../types';
 
 type ReservationFieldErrors = Partial<Record<'guest_name' | 'guest_email', string>>;
@@ -58,6 +59,8 @@ export function useReservation() {
           payload,
           controller.signal,
         );
+        // Сохраняем информацию о бронировании в LocalStorage для гостя
+        saveGuestReservation(itemId, result.reservation_token);
         return { ok: true as const, data: result };
       } catch (error) {
         if (axios.isCancel(error)) {
