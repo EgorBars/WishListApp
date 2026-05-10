@@ -1,4 +1,5 @@
 import uuid
+import secrets
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -156,6 +157,13 @@ class Reservation(Base):
     )
     guest_name: Mapped[str] = mapped_column(String(100), nullable=False)
     guest_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    reservation_token: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        unique=True,
+        default=lambda: secrets.token_urlsafe(32),
+        index=True,
+    )
     reserved_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

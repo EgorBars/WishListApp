@@ -163,7 +163,12 @@ class ReservationRequest(BaseModel):
 class ReservationResponse(BaseModel):
     message: str
     reservation_id: uuid.UUID
+    reservation_token: str
     item_title: str
+
+
+class PublicReservationCancelRequest(BaseModel):
+    reservation_token: str = Field(..., min_length=16, max_length=128)
 
 
 class PurchaseResponse(BaseModel):

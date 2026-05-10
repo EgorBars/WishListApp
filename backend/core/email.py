@@ -17,7 +17,8 @@ def send_password_reset_email(to_email: str, reset_token: str) -> None:
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = "Password reset"
-    msg["From"] = settings.smtp_user
+    from_email = settings.smtp_from_email or settings.smtp_user
+    msg["From"] = from_email
     msg["To"] = to_email
     body = (
         "You requested a password reset. Open the link below (valid for a limited time):\n\n"
@@ -27,12 +28,13 @@ def send_password_reset_email(to_email: str, reset_token: str) -> None:
     msg.attach(MIMEText(body, "plain", "utf-8"))
 
     try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as server:
-            if settings.smtp_use_tls:
+        smtp_client = smtplib.SMTP_SSL if settings.smtp_use_ssl else smtplib.SMTP
+        with smtp_client(settings.smtp_host, settings.smtp_port, timeout=30) as server:
+            if settings.smtp_use_tls and not settings.smtp_use_ssl:
                 server.starttls()
             if settings.smtp_password:
                 server.login(settings.smtp_user, settings.smtp_password)
-            server.sendmail(settings.smtp_user, to_email, msg.as_string())
+            server.sendmail(from_email, to_email, msg.as_string())
         logger.info("Password reset email sent.")
     except Exception:
         logger.exception("Failed to send password reset email.")

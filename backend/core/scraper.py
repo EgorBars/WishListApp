@@ -1,6 +1,5 @@
 import re
 import json
-import asyncio
 from decimal import Decimal
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -15,8 +14,16 @@ ua = UserAgent()
 
 class ScraperService:
     def __init__(self):
-        self.timeout = httpx.Timeout(7.0, connect=2.0, read=3.0)
-        self.headers = {"User-Agent": ua.random}
+        settings = get_settings()
+        self.timeout = httpx.Timeout(
+            settings.scraper_timeout_seconds,
+            connect=settings.scraper_connect_timeout_seconds,
+            read=settings.scraper_read_timeout_seconds,
+        )
+        self.headers = {
+            "User-Agent": settings.scraper_user_agent or ua.random,
+            "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+        }
 
     async def parse_url(self, url: str) -> dict:
         # 1. SSRF Protection

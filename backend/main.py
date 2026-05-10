@@ -11,13 +11,9 @@ settings = get_settings()
 
 app = FastAPI(title=settings.app_name)
 
-origins = [settings.frontend_url, "http://localhost:5173", "http://127.0.0.1:5173"]
-if "localhost:3000" not in settings.frontend_url:
-    origins.extend(["http://localhost:3000", "http://127.0.0.1:3000"])
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(dict.fromkeys(origins)),
+    allow_origins=settings.allowed_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
