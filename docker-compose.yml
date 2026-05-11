@@ -1,18 +1,19 @@
 services:
   db:
-    image: postgres:15-alpine
+    image: mysql:8.0
     container_name: wishlist_db
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-wishlist_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wishlist_password}
-      POSTGRES_DB: ${POSTGRES_DB:-wishlist_db}
+      MYSQL_USER: ${MYSQL_USER:-wishlist_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-wishlist_password}
+      MYSQL_DATABASE: ${MYSQL_DB:-wishlist_db}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -30,8 +31,8 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://wishlist_user:wishlist_password@db:5432/wishlist_db}
-      DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql+psycopg://wishlist_user:wishlist_password@db:5432/wishlist_db}
+      DATABASE_URL: ${DATABASE_URL:-mysql+aiomysql://wishlist_user:wishlist_password@db:3306/wishlist_db}
+      DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-mysql+pymysql://wishlist_user:wishlist_password@db:3306/wishlist_db}
       SECRET_KEY: ${SECRET_KEY:-00000000000000000000000000000000}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
     ports:
@@ -65,4 +66,4 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
+  mysql_data:

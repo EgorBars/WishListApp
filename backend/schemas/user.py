@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -31,8 +32,8 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
-    sub: str | None = None
-    token_type: str | None = None
+    sub: Optional[str] = None
+    token_type: Optional[str] = None
 
 
 class ForgotPasswordRequest(BaseModel):

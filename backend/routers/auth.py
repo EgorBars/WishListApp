@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -59,7 +60,7 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)) -> U
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> Token:
     stmt = select(User).where(User.email == str(body.username))
     res = await db.execute(stmt)
-    user: User | None = res.scalar_one_or_none()
+    user: Optional[User] = res.scalar_one_or_none()
     if user is None or not verify_password(body.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -90,7 +91,7 @@ async def forgot_password(
 
     stmt = select(User).where(User.email == body.email)
     res = await db.execute(stmt)
-    user: User | None = res.scalar_one_or_none()
+    user: Optional[User] = res.scalar_one_or_none()
 
     if user is not None:
         token_str = create_reset_password_token(user.id)

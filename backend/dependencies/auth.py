@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -13,8 +14,8 @@ security = HTTPBearer(auto_error=False)
 
 
 async def get_token_optional(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
-) -> str | None:
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[str]:
     if credentials is None:
         return None
     if credentials.scheme.lower() != "bearer":
@@ -23,7 +24,7 @@ async def get_token_optional(
 
 
 async def get_current_user(
-    token: str | None = Depends(get_token_optional),
+    token: Optional[str] = Depends(get_token_optional),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     not_authenticated = HTTPException(
@@ -51,7 +52,7 @@ async def get_current_user(
 
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
-    user: User | None = result.scalar_one_or_none()
+    user: Optional[User] = result.scalar_one_or_none()
     if user is None:
         raise invalid_credentials
     if not user.is_active:

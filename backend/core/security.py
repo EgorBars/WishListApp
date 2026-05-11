@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID
 
 from jose import JWTError, jwt
@@ -21,7 +21,7 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password, rounds=BCRYPT_ROUNDS)
 
 
-def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
+def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     settings = get_settings()
     now = datetime.now(timezone.utc)
     expire = now + (
@@ -55,7 +55,7 @@ def decode_access_token(token: str) -> TokenData:
     settings = get_settings()
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        subject: str | None = payload.get("sub")
+        subject: Optional[str] = payload.get("sub")
         token_type = payload.get("type")
         if subject is None:
             return TokenData(sub=None, token_type=token_type)

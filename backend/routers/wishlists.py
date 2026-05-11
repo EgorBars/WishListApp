@@ -270,7 +270,7 @@ async def add_item(
     normalized_url = body.url.strip()
     stmt = select(Item).where(Item.url == normalized_url)
     res = await db.execute(stmt)
-    item: Item | None = res.scalar_one_or_none()
+    item: Optional[Item] = res.scalar_one_or_none()
 
     if item is None:
         item = Item(
@@ -340,7 +340,7 @@ async def update_item(
         WishlistItem.item_id == item_id,
     )
     res = await db.execute(stmt)
-    wi: WishlistItem | None = res.scalar_one_or_none()
+    wi: Optional[WishlistItem] = res.scalar_one_or_none()
     if wi is None:
         raise HTTPException(status_code=404, detail="Item not found")
 
